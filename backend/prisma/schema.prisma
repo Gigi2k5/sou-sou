@@ -1,0 +1,644 @@
+// =============================================================================
+// Sou'Sou — Prisma schema
+// =============================================================================
+// Modèle de données complet pour la V1.
+// Voir le brief pour la sémantique de chaque table.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// User & Auth
+// -----------------------------------------------------------------------------
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id        String  @id @default(uuid())
+  email     String  @unique
+  password  String
+  name      String
+  currency  String  @default("FCFA")
+  role      Role    @default(USER)
+  // String opaque : "preset:pig-green" ou "upload:{userId}.jpg".
+  // Le front résout l'URL finale via lib/avatar.ts.
+  avatarUrl String?
+
+  // Gamification
+  totalPoints        Int       @default(0)
+  currentStreak      Int       @default(0)
+  bestStreak         Int       @default(0)
+  lastContributionAt DateTime?
+
+  // Reset password
+  resetToken          String?   @unique
+  resetTokenExpiresAt DateTime?
+
+  // Modération
+  isBanned    Boolean   @default(false)
+  banReason   String?
+  bannedAt    DateTime?
+  /// userId de l'admin qui a banni — pas de FK pour ne pas bloquer
+  /// la suppression de l'admin lui-même.
+  bannedBy    String?
+  /// Mis à jour uniquement sur login réel (POST /auth/login), pas refresh.
+  lastLoginAt DateTime?
+
+  /// Préférence de thème — "light", "dark", ou "system" (défaut).
+  /// next-themes gère le localStorage, on persiste pour resync entre devices.
+  theme String @default("system")
+
+  /// Onboarding V4 — flow guidé au signup (5 étapes conditionnelles côté front).
+  /// `hasCompletedOnboarding` = true backfillé pour tous les users existants
+  /// au déploiement, donc le flow ne se déclenche que pour les nouveaux comptes.
+  hasCompletedOnboarding Boolean   @default(false)
+  /// Étape courante (0 = pas commencé, 1-N = en cours, complété = step final).
+  /// Permet de reprendre le flow là où l'user l'a laissé.
+  onboardingStep         Int       @default(0)
+  /// Timestamp de complétion — utile pour analytics et cohérence du badge.
+  onboardingCompletedAt  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  refreshTokens         RefreshToken[]
+  incomeSources         IncomeSource[]
+  expenseCategories     ExpenseCategory[]
+  transactions          Transaction[]
+  savingsGoal           SavingsGoal?
+  badges                UserBadge[]
+  articles              Article[]
+  articleLikes          ArticleLike[]
+  articleComments       ArticleComment[]
+  notifications         Notification[]
+  avatarUnlocks         AvatarUnlock[]
+  ownedMoneyPots        MoneyPot[]             @relation("OwnedMoneyPots")
+  moneyPotMemberships   MoneyPotMember[]
+  recurringTransactions RecurringTransaction[]
+  adminLogs             AdminLog[]             @relation("AdminLogs")
+  reports               Report[]               @relation("Reports")
+  addedResources        Resource[]             @relation("AddedResources")
+  createdBroadcasts     Broadcast[]            @relation("CreatedBroadcasts")
+  budgets               Budget[]
+
+  @@index([email])
+  @@index([isBanned])
+  @@index([lastLoginAt])
+}
+
+// -----------------------------------------------------------------------------
+// Signalements (modération communautaire)
+// -----------------------------------------------------------------------------
+// Un user peut signaler un contenu (article, plus tard commentaire/user) avec
+// une raison parmi un enum. Contrainte d'unicité : un user ne peut signaler
+// la même cible qu'une seule fois (anti-spam de signalement).
+//
+// `targetId` n'est pas une FK relationnelle — la cible peut être supprimée
+// après le signalement et le report reste pour l'audit.
+
+enum ReportTarget {
+  ARTICLE
+  COMMENT
+  USER
+}
+
+enum ReportReason {
+  SPAM
+  INAPPROPRIATE
+  MISINFORMATION
+  HARASSMENT
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  REJECTED
+}
+
+model Report {
+  id           String       @id @default(uuid())
+  /// Auteur du signalement. SetNull si l'user est supprimé après coup
+  /// (préserve l'historique de modération).
+  reporterId   String?
+  reporter     User?        @relation("Reports", fields: [reporterId], references: [id], onDelete: SetNull)
+  targetType   ReportTarget
+  targetId     String
+  reason       ReportReason
+  description  String?
+  status       ReportStatus @default(PENDING)
+  /// Note de l'admin qui a traité le signalement.
+  adminNote    String?
+  /// userId de l'admin qui a résolu/rejeté.
+  resolvedById String?
+  resolvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+
+  @@unique([reporterId, targetType, targetId])
+  @@index([status, createdAt])
+  @@index([targetType, targetId])
+}
+
+// -----------------------------------------------------------------------------
+// Admin — audit log
+// -----------------------------------------------------------------------------
+// Traçabilité de toutes les actions admin sensibles (ban, suppression article,
+// promotion de rôle, broadcast, etc.). `adminId` est nullable pour préserver
+// les logs si l'admin lui-même est supprimé plus tard.
+
+// -----------------------------------------------------------------------------
+// Broadcasts (notifications globales)
+// -----------------------------------------------------------------------------
+// Un admin envoie une notification à un segment d'utilisateurs (tous, actifs
+// récents, inactifs, nouveaux, admins). Pour chaque destinataire on crée une
+// `Notification` de type ADMIN_BROADCAST avec broadcastId dans `data`.
+
+enum BroadcastSegment {
+  ALL
+  ACTIVE_7D
+  INACTIVE_30D
+  NEW_USERS_7D
+  ADMINS
+}
+
+model Broadcast {
+  id        String           @id @default(uuid())
+  title     String
+  body      String           @db.Text
+  segment   BroadcastSegment
+  /// Snapshot du nombre d'utilisateurs ciblés au moment de l'envoi.
+  recipientCount Int          @default(0)
+  /// Admin qui a envoyé. SetNull si l'admin est supprimé après coup.
+  createdById String?
+  createdBy   User?           @relation("CreatedBroadcasts", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime        @default(now())
+
+  @@index([segment])
+  @@index([createdAt])
+}
+
+model AdminLog {
+  id         String   @id @default(uuid())
+  /// Admin auteur de l'action — null si l'admin a été supprimé après coup.
+  adminId    String?
+  admin      User?    @relation("AdminLogs", fields: [adminId], references: [id], onDelete: SetNull)
+  /// Code d'action machine-friendly : "BAN_USER", "UNBAN_USER", "DELETE_USER",
+  /// "PROMOTE_ROLE", "DEMOTE_ROLE", "HIDE_ARTICLE", "DELETE_ARTICLE",
+  /// "WARN_AUTHOR", "RESOLVE_REPORT", "BROADCAST", etc.
+  action     String
+  /// Type de la cible (User, Article, Report, MoneyPot...) — null pour broadcast global.
+  targetType String?
+  targetId   String?
+  /// Détails libres (raison, montant, segment, etc.).
+  details    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([adminId, createdAt])
+  @@index([action, createdAt])
+  @@index([targetType, targetId])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  tokenHash String    @unique
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// Tracker (revenus & dépenses)
+// -----------------------------------------------------------------------------
+
+enum TxType {
+  INCOME
+  EXPENSE
+}
+
+model IncomeSource {
+  id                    String                 @id @default(uuid())
+  name                  String
+  userId                String
+  user                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions          Transaction[]
+  recurringTransactions RecurringTransaction[]
+  createdAt             DateTime               @default(now())
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+/// Une catégorie peut être :
+/// - FREE : créée par l'user, librement éditable
+/// - SAVINGS : auto-créée pour un SavingsGoal — `system: true`, non-modifiable
+/// - POT : auto-créée pour un MoneyPot (1 par membre du pot) — `system: true`
+///
+/// Pour les catégories système, le pot/épargne est la source de vérité du nom.
+/// Les transactions liées incrémentent automatiquement la progression du
+/// pot/épargne (somme côté lecture).
+model ExpenseCategory {
+  id     String @id @default(uuid())
+  name   String
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  kind   CategoryKind @default(FREE)
+  system Boolean      @default(false)
+
+  moneyPotId String?
+  moneyPot   MoneyPot? @relation(fields: [moneyPotId], references: [id], onDelete: Cascade)
+
+  savingsGoalId String?      @unique
+  savingsGoal   SavingsGoal? @relation(fields: [savingsGoalId], references: [id], onDelete: Cascade)
+
+  transactions          Transaction[]
+  recurringTransactions RecurringTransaction[]
+  budget                Budget?
+  createdAt             DateTime               @default(now())
+
+  @@unique([userId, name])
+  @@unique([userId, moneyPotId])
+  @@index([userId])
+  @@index([moneyPotId])
+}
+
+enum CategoryKind {
+  FREE
+  SAVINGS
+  POT
+}
+
+// -----------------------------------------------------------------------------
+// Budgets mensuels par catégorie (V4)
+// -----------------------------------------------------------------------------
+// L'utilisateur définit un plafond mensuel sur une catégorie de dépense (FREE
+// uniquement — les SAVINGS/POT sont déjà encadrées par les objectifs/cotisations).
+// Le compteur se reset au 1er de chaque mois (calendaire), pas de stockage de
+// `currentSpent` : on l'agrège à la volée depuis les transactions.
+
+model Budget {
+  id             String          @id @default(uuid())
+  userId         String
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Une catégorie ne peut avoir qu'un seul budget actif. Cascade : si la
+  /// catégorie est supprimée, le budget l'est aussi.
+  categoryId     String          @unique
+  category       ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  monthlyLimit   Float
+  /// Seuil d'alerte (entre 0.5 et 0.95, défaut 0.8 = 80%).
+  alertThreshold Float           @default(0.8)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([userId])
+}
+
+model Transaction {
+  id     String   @id @default(uuid())
+  type   TxType
+  amount Float
+  date   DateTime
+  note   String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  incomeSourceId String?
+  incomeSource   IncomeSource? @relation(fields: [incomeSourceId], references: [id], onDelete: SetNull)
+
+  expenseCategoryId String?
+  expenseCategory   ExpenseCategory? @relation(fields: [expenseCategoryId], references: [id], onDelete: SetNull)
+
+  /// Set par le cron quand cette transaction est générée par une récurrence.
+  /// Reste éditable comme une transaction normale (date / montant / note).
+  recurringTransactionId String?
+  recurringTransaction   RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, date])
+  @@index([userId, type])
+  @@index([recurringTransactionId])
+}
+
+// -----------------------------------------------------------------------------
+// Transactions récurrentes (MONTHLY only, V2)
+// -----------------------------------------------------------------------------
+// Une règle = un revenu/dépense qui revient chaque mois au jour `dayOfMonth`.
+// Matérialisée par un cron quotidien à 1h. Si dayOfMonth > daysInMonth (ex:
+// 31 en février), on matérialise le dernier jour du mois.
+
+model RecurringTransaction {
+  id         String  @id @default(uuid())
+  type       TxType
+  amount     Float
+  /// 1..31 — clampé au dernier jour du mois si > daysInMonth.
+  dayOfMonth Int
+  note       String?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  incomeSourceId String?
+  incomeSource   IncomeSource? @relation(fields: [incomeSourceId], references: [id], onDelete: SetNull)
+
+  expenseCategoryId String?
+  expenseCategory   ExpenseCategory? @relation(fields: [expenseCategoryId], references: [id], onDelete: SetNull)
+
+  /// Met en pause sans supprimer (toggles UI "Activer / Mettre en pause").
+  isActive Boolean @default(true)
+
+  generatedTransactions Transaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([dayOfMonth, isActive])
+}
+
+// -----------------------------------------------------------------------------
+// Épargne (1 objectif actif par user)
+// -----------------------------------------------------------------------------
+
+/// L'épargne (1 objectif actif par user). `currentAmount` n'est plus stocké :
+/// il se dérive en sommant les Transaction expense liées à `category`
+/// (catégorie système SAVINGS auto-créée à la création de l'objectif).
+model SavingsGoal {
+  id               String   @id @default(uuid())
+  name             String
+  targetAmount     Float
+  dailyAmount      Float
+  deadline         DateTime
+  isCompleted      Boolean  @default(false)
+  /// Paliers déjà notifiés (50, 80) — anti-spam multi-cotisations.
+  progressNotified Int[]    @default([])
+
+  userId   String           @unique
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category ExpenseCategory?
+
+  createdAt   DateTime  @default(now())
+  completedAt DateTime?
+}
+
+// -----------------------------------------------------------------------------
+// Gamification
+// -----------------------------------------------------------------------------
+
+model Badge {
+  id          String      @id @default(uuid())
+  code        String      @unique
+  name        String
+  description String
+  icon        String
+  users       UserBadge[]
+}
+
+model UserBadge {
+  userId     String
+  badgeId    String
+  unlockedAt DateTime @default(now())
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@id([userId, badgeId])
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// Contenu (articles & ressources)
+// -----------------------------------------------------------------------------
+
+model Article {
+  id         String  @id @default(uuid())
+  title      String
+  slug       String  @unique
+  content    String  @db.Text
+  excerpt    String
+  coverImage String?
+
+  authorId String
+  author   User   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  // Modération admin (V3)
+  isHidden     Boolean   @default(false)
+  hiddenAt     DateTime?
+  hiddenBy     String?
+  hiddenReason String?
+  reportCount  Int       @default(0)
+
+  /// Compteurs dénormalisés — maintenus à la main par les services
+  /// ArticleLikesService / ArticleCommentsService (incr/decr atomique avec
+  /// l'opération métier). Évite un COUNT(*) à chaque lecture de liste.
+  likeCount    Int @default(0)
+  commentCount Int @default(0)
+
+  likes    ArticleLike[]
+  comments ArticleComment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([authorId])
+  @@index([isHidden])
+  @@index([reportCount])
+}
+
+// -----------------------------------------------------------------------------
+// Likes & Comments (V4)
+// -----------------------------------------------------------------------------
+
+model ArticleLike {
+  id        String   @id @default(uuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([articleId, userId])
+  @@index([userId])
+  @@index([articleId])
+}
+
+model ArticleComment {
+  id        String   @id @default(uuid())
+  articleId String
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  /// Plain text — auto-link des URLs côté front uniquement (pas de markdown).
+  body      String   @db.Text
+
+  // Modération admin (parallèle à Article)
+  isHidden     Boolean   @default(false)
+  hiddenAt     DateTime?
+  hiddenBy     String?
+  hiddenReason String?
+  reportCount  Int       @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([articleId, createdAt])
+  @@index([authorId])
+  @@index([isHidden])
+  @@index([reportCount])
+}
+
+model Resource {
+  id           String   @id @default(uuid())
+  videoId      String   @unique
+  title        String
+  channelName  String
+  thumbnailUrl String
+  youtubeUrl   String
+  description  String?
+  category     String?
+
+  /// Position dans l'ordre admin — petites valeurs en premier.
+  /// Float pour pouvoir insérer entre deux items sans renuméroter.
+  position    Float    @default(0)
+  /// Mis en avant : badge + tri prioritaire en tête de liste publique.
+  isFeatured  Boolean  @default(false)
+  /// Admin qui a ajouté la ressource. SetNull si admin supprimé.
+  addedById   String?
+  addedBy     User?    @relation("AddedResources", fields: [addedById], references: [id], onDelete: SetNull)
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([category])
+  @@index([position])
+  @@index([isFeatured])
+}
+
+// -----------------------------------------------------------------------------
+// Notifications in-app (centre de notifs + cron rappels)
+// -----------------------------------------------------------------------------
+
+enum NotifType {
+  CONTRIBUTION_REMINDER
+  STREAK_AT_RISK
+  BADGE_UNLOCKED
+  GOAL_COMPLETED
+  AVATAR_UNLOCKED
+  CONTRIBUTION_GOAL_PROGRESS
+  CONTRIBUTION_GOAL_COMPLETED
+  CONTRIBUTION_NEW_MEMBER
+  CONTRIBUTION_PAYMENT_RECEIVED
+  ADMIN_WARNING
+  ADMIN_HIDE_NOTICE
+  ADMIN_DELETE_NOTICE
+  ADMIN_BROADCAST
+  BUDGET_WARNING
+  BUDGET_EXCEEDED
+  ARTICLE_LIKED
+  ARTICLE_COMMENTED
+}
+
+model Notification {
+  id String @id @default(uuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type  NotifType
+  title String
+  body  String
+  /// Métadonnées libres : { goalId, badgeCode, ... }
+  data  Json?
+
+  isRead    Boolean   @default(false)
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, isRead])
+}
+
+// -----------------------------------------------------------------------------
+// Avatars débloqués par achievement (V2.5)
+// -----------------------------------------------------------------------------
+
+model AvatarUnlock {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Clé matchée à PRESET_AVATARS (ex: "pig-green", "lion", ...).
+  avatarKey  String
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, avatarKey])
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
+// Cotisations (MoneyPot) — V2.5
+// -----------------------------------------------------------------------------
+// Pots solo (1 user, ownerId = userId, isGroup=false) ou groupe (plusieurs
+// membres, code d'invitation 6 chars sans I/O/0/1).
+//
+// `currentAmount` n'est plus stocké : il se dérive en sommant les Transaction
+// expense liées aux catégories système POT (1 catégorie par membre, toutes
+// liées au même `moneyPotId`).
+
+model MoneyPot {
+  id               String    @id @default(uuid())
+  name             String
+  description      String?
+  targetAmount     Float
+  deadline         DateTime?
+  isCompleted      Boolean   @default(false)
+  completedAt      DateTime?
+  isGroup          Boolean   @default(false)
+  /// Code 6 chars sans I/O/0/1 (groupe seulement, null si solo).
+  inviteCode       String?   @unique
+  /// Paliers déjà notifiés (50, 80) — anti-spam multi-paiements.
+  progressNotified Int[]     @default([])
+
+  ownerId    String
+  owner      User              @relation("OwnedMoneyPots", fields: [ownerId], references: [id], onDelete: Cascade)
+  members    MoneyPotMember[]
+  categories ExpenseCategory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model MoneyPotMember {
+  id String @id @default(uuid())
+
+  moneyPotId String
+  moneyPot   MoneyPot @relation(fields: [moneyPotId], references: [id], onDelete: Cascade)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  joinedAt DateTime @default(now())
+
+  @@unique([moneyPotId, userId])
+  @@index([userId])
+}

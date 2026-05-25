@@ -1,0 +1,39 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sousou-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: sousou
+      POSTGRES_PASSWORD: sousou_dev_password
+      POSTGRES_DB: sousou
+    ports:
+      - "5532:5432"
+    volumes:
+      - sousou_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sousou -d sousou"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: sousou-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@sousou.local
+      PGADMIN_DEFAULT_PASSWORD: admin
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    ports:
+      - "5150:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - sousou_pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  sousou_pg_data:
+  sousou_pgadmin_data:

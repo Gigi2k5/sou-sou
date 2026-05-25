@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+
+# Environment
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# Cache
+.cache/
+
+# OS
+.DS_Store
+
+# Avatars uploadés par les users (servis en statique via /uploads)
+uploads/
+
+# Prisma cache local
+.prisma/
