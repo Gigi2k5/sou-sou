@@ -96,7 +96,7 @@ Guide pas-à-pas pour mettre Sou'Sou en production : frontend Next.js sur **Verc
 | **Branch** | `main` |
 | **Root Directory** | `backend` |
 | **Runtime** | `Node` |
-| **Build Command** | `npm install && npx prisma generate && npx prisma migrate deploy && npm run build` |
+| **Build Command** | `npm install --include=dev && npx prisma generate && npx prisma migrate deploy && npm run build` |
 | **Start Command** | `node dist/main` |
 | **Plan** | **Starter** ($7/mois) — recommandé. Le Free dort après 15 min d'inactivité et la première requête met ~30s à répondre, ce qui casse l'UX au login. |
 | **Health Check Path** | `/health` |
@@ -139,9 +139,9 @@ Sur la page de configuration du service, section **Environment** → **Add Envir
    🐷 Sou'Sou API running on http://localhost:10000
    📚 Swagger docs: http://localhost:10000/api/docs
    ```
-4. L'URL publique de ton API est `https://sousou-api.onrender.com` (Render te la donne en haut du service).
+4. L'URL publique de ton API est `https://sousou-api-wehh.onrender.com` (Render te la donne en haut du service).
 
-> 💡 **Test rapide** : ouvre `https://sousou-api.onrender.com/health` dans ton navigateur. Tu dois voir un JSON `{ "status": "ok" }` ou similaire.
+> 💡 **Test rapide** : ouvre `https://sousou-api-wehh.onrender.com/health` dans ton navigateur. Tu dois voir un JSON `{ "status": "ok" }` ou similaire.
 
 ---
 
@@ -167,7 +167,7 @@ Avant le premier deploy, déroule **Environment Variables** :
 
 | Clé | Valeur | Note |
 |---|---|---|
-| `NEXT_PUBLIC_API_URL` | `https://sousou-api.onrender.com` | ⚠️ **sans `/api` à la fin** — l'axios baseURL ajoute `/api` automatiquement |
+| `NEXT_PUBLIC_API_URL` | `https://sousou-api-wehh.onrender.com` | ⚠️ **sans `/api` à la fin** — l'axios baseURL ajoute `/api` automatiquement |
 | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | *ton cloud_name Cloudinary* | la partie après le `@` dans `CLOUDINARY_URL` — cf. [section dédiée](#storage-des-images--avatars-uploadés-cloudinary) |
 
 > 💡 Le préfixe `NEXT_PUBLIC_` est obligatoire pour que la variable soit accessible depuis le navigateur. Sans ce préfixe, elle ne serait dispo que côté serveur (Server Components / API Routes).
@@ -211,8 +211,8 @@ Le seed admin **n'est pas automatique** (pas de compte admin par défaut en prod
 
 Tester dans l'ordre, avec un compte fraîchement créé :
 
-- [ ] `https://sousou-api.onrender.com/health` → JSON OK
-- [ ] `https://sousou-api.onrender.com/api/docs` → Swagger accessible
+- [ ] `https://sousou-api-wehh.onrender.com/health` → JSON OK
+- [ ] `https://sousou-api-wehh.onrender.com/api/docs` → Swagger accessible
 - [ ] Site Vercel s'ouvre sans erreur 500
 - [ ] **Signup** depuis le site → redirige sur le dashboard
 - [ ] **Cookie d'auth bien posé** : DevTools (F12) → onglet **Application** → **Cookies** → tu dois voir `access_token` avec :
@@ -387,6 +387,16 @@ Avec Cloudinary on **n'a pas besoin** du Render Disk persistant ($0.25/mois éco
   git push
   ```
   → Render relance le build et applique les migrations.
+
+### 4 bis. Build Render échoue avec `sh: 1: nest: not found`
+
+- **Symptôme** : logs Render montrent `nest: not found` (ou `next: not found`) à l'étape `npm run build`, alors que les migrations Prisma sont bien passées juste avant.
+- **Cause** : avec `NODE_ENV=production`, `npm install` ignore les `devDependencies`. Or `@nestjs/cli` (qui contient le binaire `nest`) est dans les devDeps — donc pas installé.
+- **Solution** : dans Render → service → **Settings → Build Command** → ajouter le flag `--include=dev` :
+  ```
+  npm install --include=dev && npx prisma generate && npx prisma migrate deploy && npm run build
+  ```
+  Puis **Manual Deploy** pour relancer.
 
 ### 5. Vercel cache les env vars publiques
 

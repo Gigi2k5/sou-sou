@@ -111,12 +111,22 @@ export class TokensService {
   }
 
   private baseCookieOptions(): CookieOptions {
-    return {
+    const opts: CookieOptions = {
       httpOnly: true,
       secure: this.cookieSecure,
       sameSite: this.cookieSameSite,
       domain: this.cookieDomain,
     };
+    // CHIPS (Partitioned Cookies) : quand le cookie est cross-site
+    // (sameSite=none), les navigateurs récents (Firefox 103+, Chrome 114+)
+    // refusent de le stocker s'il n'est pas marqué Partitioned. Sans ça,
+    // l'auth cross-domain Vercel↔Render échoue silencieusement (les cookies
+    // sont posés mais jamais renvoyés au backend).
+    // https://developer.mozilla.org/en-US/docs/Web/Privacy/Privacy_sandbox/Partitioned_cookies
+    if (this.cookieSameSite === 'none') {
+      (opts as CookieOptions & { partitioned?: boolean }).partitioned = true;
+    }
+    return opts;
   }
 
   private accessCookieOptions(): CookieOptions {
