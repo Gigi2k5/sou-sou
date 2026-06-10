@@ -1,52 +1,25 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 /**
- * Middleware Next.js qui protège l'espace `/admin/*`.
+ * Middleware Next.js — no-op en prod.
  *
- * On lit le cookie `access_token` (JWT signé par le backend), on **décode**
- * (sans vérifier la signature — ce serait trop coûteux et le secret n'a rien
- * à faire côté front) son payload pour récupérer le `role`. Si le user
- * n'est pas authentifié → redirect `/login`. Si le user est authentifié
- * mais pas admin → redirect `/dashboard`.
+ * Historiquement on protégeait /admin/* en lisant le cookie `access_token` ici
+ * pour redirect vers /login si absent ou non-admin. Mais en prod cross-domain
+ * (Vercel ↔ Render), le cookie est posé sur le domaine du backend (Render) avec
+ * SameSite=None — il n'est jamais visible côté Vercel, donc ce middleware
+ * redirigeait systématiquement les admins authentifiés vers /login → boucle.
  *
- * La vérification réelle de la signature et du rôle est faite par le backend
- * via `JwtAuthGuard` + `AdminGuard`. Ce middleware est uniquement de l'UX :
- * éviter qu'un user normal arrive sur la coquille admin avec des appels qui
- * échouent ensuite. Un user qui forgerait un JWT `role:ADMIN` verrait la
- * coquille mais aucun endpoint ne répondrait.
+ * La protection est désormais assurée à 2 niveaux :
+ *   - AdminLayout (côté client) : redirige si user.role !== 'ADMIN'
+ *   - AdminGuard (backend)      : rejette toute requête admin non autorisée
+ *
+ * On garde le fichier pour pouvoir réintroduire facilement une logique
+ * server-side si on adopte un domaine custom partagé (cookies non cross-site).
  */
-export function middleware(req: NextRequest) {
-  const token = req.cookies.get("access_token")?.value;
-
-  if (!token) {
-    const loginUrl = new URL("/login", req.url);
-    loginUrl.searchParams.set("from", req.nextUrl.pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  const role = decodeRoleFromJwt(token);
-  if (role !== "ADMIN") {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
-
+export function middleware() {
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: [],
 };
-
-function decodeRoleFromJwt(token: string): string | null {
-  const parts = token.split(".");
-  if (parts.length !== 3) return null;
-  try {
-    // base64url → base64 standard, puis decode.
-    const payloadB64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = payloadB64 + "=".repeat((4 - (payloadB64.length % 4)) % 4);
-    const json = atob(padded);
-    const payload = JSON.parse(json) as { role?: string };
-    return payload.role ?? null;
-  } catch {
-    return null;
-  }
-}
