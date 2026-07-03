@@ -113,8 +113,13 @@ export function OnboardingModal() {
             "flex flex-col overflow-hidden",
           )}
         >
-          {/* Header avec progression + skip */}
-          <header className="px-6 py-4 border-b border-border/60 flex items-center gap-3 shrink-0">
+          {/* Header avec progression + skip. aria-live pour annoncer le
+              changement d'étape aux lecteurs d'écran. */}
+          <header
+            className="px-6 py-4 border-b border-border/60 flex items-center gap-3 shrink-0"
+            aria-live="polite"
+            aria-atomic="true"
+          >
             <span
               id="onboarding-title"
               className="text-xs font-semibold uppercase tracking-wider text-sousou-neutral shrink-0"

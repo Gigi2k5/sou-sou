@@ -108,7 +108,7 @@ export function ThemeToggle({
       className={cn(
         "relative size-9 rounded-lg flex items-center justify-center",
         "text-sousou-neutral hover:bg-muted hover:text-sousou-secondary transition-colors",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         className,
       )}
     >

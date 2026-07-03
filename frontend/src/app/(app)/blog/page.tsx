@@ -80,7 +80,7 @@ export default function BlogPage() {
 
 function EmptyBlog() {
   return (
-    <div className="rounded-3xl bg-gradient-to-br from-sousou-primary-50 via-card to-card border border-border/60 p-10 text-center">
+    <div className="rounded-3xl bg-gradient-to-br from-sousou-primary-50 via-card to-card dark:from-sousou-primary/10 dark:via-card dark:to-card border border-border/60 p-10 text-center">
       <div className="flex justify-center mb-4">
         <MascotAnimated mood="thinking" size="md" interactive disableConfetti />
       </div>

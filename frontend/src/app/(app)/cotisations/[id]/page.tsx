@@ -79,11 +79,16 @@ export default function MoneyPotDetailPage() {
   const currency = user?.currency ?? "FCFA";
 
   function handlePaid(paidAmount: number) {
+    // Capture le "was completed" à partir du state courant (fonctionnel), pas
+    // via une closure sur `pot` qui peut être stale entre 2 clics rapides.
+    let wasCompleted = false;
+    setPot((current) => {
+      wasCompleted = current?.isCompleted ?? false;
+      return current;
+    });
     void refresh().then(() => {
-      // refresh() recharge `pot` — on déclenche les confettis si on vient juste
-      // d'atteindre l'objectif (vérifié à partir de l'état frais).
       setPot((current) => {
-        if (current?.isCompleted && !pot?.isCompleted) {
+        if (current?.isCompleted && !wasCompleted) {
           setConfetti((c) => c + 1);
           toast.success("Objectif atteint !");
         }

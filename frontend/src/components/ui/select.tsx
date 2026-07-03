@@ -63,24 +63,31 @@ function SelectContent({
 function SelectItem({
   className,
   children,
+  label,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+}: React.ComponentProps<typeof SelectPrimitive.Item> & {
+  /** Label texte affiché dans le trigger quand l'item est sélectionné.
+   *  Obligatoire si `children` contient autre chose qu'une simple string
+   *  (badges, icônes) — sinon base-ui ne peut pas extraire le label et
+   *  fall-back sur la value (l'id UUID). */
+  label?: string;
+}) {
   return (
     <SelectPrimitive.Item
       className={cn(
         "relative flex w-full cursor-pointer select-none items-center gap-2 rounded-xl px-3 py-2 text-sm",
         "outline-none transition-colors",
         "data-[highlighted]:bg-sousou-primary-50 data-[highlighted]:text-sousou-primary-700",
+        "dark:data-[highlighted]:bg-sousou-primary/15 dark:data-[highlighted]:text-sousou-primary",
         className,
       )}
+      label={label}
       {...props}
     >
       <SelectPrimitive.ItemIndicator className="ml-auto">
         <Check className="size-4 text-sousou-primary" />
       </SelectPrimitive.ItemIndicator>
-      <SelectPrimitive.ItemText className="flex-1">
-        {children}
-      </SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   );
 }

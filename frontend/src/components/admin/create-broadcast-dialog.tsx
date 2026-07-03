@@ -291,6 +291,7 @@ export function CreateBroadcastDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
+                disabled={loadingPreview}
               >
                 Annuler
               </Button>

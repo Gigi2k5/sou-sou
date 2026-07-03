@@ -55,18 +55,20 @@ export function TransactionItem({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sousou-secondary truncate text-sm inline-flex items-center gap-1.5">
-          {label}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="font-medium text-sousou-secondary truncate text-sm">
+            {label}
+          </span>
           {tx.recurringTransactionId && (
             <span
-              className="inline-flex items-center justify-center size-4 rounded-full bg-sousou-primary-50 text-sousou-primary-700 shrink-0"
+              className="inline-flex items-center justify-center size-4 rounded-full bg-sousou-primary-50 text-sousou-primary-700 dark:bg-sousou-primary/15 dark:text-sousou-primary shrink-0"
               aria-label="Transaction récurrente"
               title="Générée automatiquement par une récurrence"
             >
               <Repeat className="size-2.5" />
             </span>
           )}
-        </p>
+        </div>
         <p className="text-xs text-sousou-neutral truncate">
           {formatDateRelative(tx.date)}
           {tx.note ? ` · ${tx.note}` : ""}

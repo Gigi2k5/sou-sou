@@ -130,7 +130,7 @@ function RecapBody({
   return (
     <div className="space-y-4">
       {/* TOTAL hybride : gros chiffre + breakdown en dessous */}
-      <div className="rounded-2xl bg-gradient-to-br from-sousou-primary-50 via-card to-card border border-border/60 p-5">
+      <div className="rounded-2xl bg-gradient-to-br from-sousou-primary-50 via-card to-card dark:from-sousou-primary/10 dark:via-card dark:to-card border border-border/60 p-5">
         <div className="flex items-baseline justify-between gap-3 mb-1">
           <span className="text-xs font-semibold uppercase tracking-widest text-sousou-neutral">
             Total cotisé

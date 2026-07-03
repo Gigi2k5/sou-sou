@@ -64,16 +64,25 @@ export function NotificationBell({
     };
   }, [refreshUnread]);
 
+  // Ref pour ignorer les fetchs concurrents (ouvrir/fermer rapidement la modale
+  // peut lancer 2 fetchs — on garde que le plus récent).
+  const loadTokenRef = useRef(0);
+
   const loadList = useCallback(async () => {
+    const myToken = ++loadTokenRef.current;
     setLoading(true);
     try {
       const page = await listNotifications({ page: 1, limit: 30 });
+      // Un fetch plus récent a été lancé entre-temps : on abandonne ce résultat.
+      if (myToken !== loadTokenRef.current) return;
       setItems(page.items);
       setUnread(page.unreadCount);
     } catch {
-      toast.error("Notifications indisponibles");
+      if (myToken === loadTokenRef.current) {
+        toast.error("Notifications indisponibles");
+      }
     } finally {
-      setLoading(false);
+      if (myToken === loadTokenRef.current) setLoading(false);
     }
   }, []);
 

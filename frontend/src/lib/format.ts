@@ -3,19 +3,21 @@
  * `FCFA` est l'alias local du XOF/XAF — Intl ne l'accepte pas, on l'affiche en suffixe manuellement.
  */
 export function formatMoney(amount: number, currency = "FCFA"): string {
+  // Guard NaN/Infinity : mieux vaut afficher "0 FCFA" que "NaN FCFA" ou "∞ FCFA".
+  const safe = Number.isFinite(amount) ? amount : 0;
   if (currency === "FCFA" || currency === "XOF" || currency === "XAF") {
     return `${new Intl.NumberFormat("fr-FR", {
       maximumFractionDigits: 0,
-    }).format(Math.round(amount))} FCFA`;
+    }).format(Math.round(safe))} FCFA`;
   }
   try {
     return new Intl.NumberFormat("fr-FR", {
       style: "currency",
       currency,
       maximumFractionDigits: 2,
-    }).format(amount);
+    }).format(safe);
   } catch {
-    return `${new Intl.NumberFormat("fr-FR").format(amount)} ${currency}`;
+    return `${new Intl.NumberFormat("fr-FR").format(safe)} ${currency}`;
   }
 }
 

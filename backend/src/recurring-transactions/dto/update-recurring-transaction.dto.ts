@@ -21,7 +21,7 @@ export class UpdateRecurringTransactionDto {
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)
-  @IsNumber()
+  @IsNumber({ maxDecimalPlaces: 2 })
   @Min(0.01)
   @Max(1_000_000_000)
   amount?: number;

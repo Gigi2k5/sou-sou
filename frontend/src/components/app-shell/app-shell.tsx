@@ -5,6 +5,7 @@ import {
   BookOpen,
   GraduationCap,
   LayoutDashboard,
+  LayoutGrid,
   LogOut,
   PiggyBank,
   Receipt,
@@ -32,7 +33,10 @@ interface NavItem {
   href: string;
   label: string;
   icon: typeof LayoutDashboard;
+  /** Caché du bottom-nav mobile (mais visible dans la sidebar desktop et /plus). */
   desktopOnly?: boolean;
+  /** N'apparaît que sur mobile (le "Plus" est inutile sur desktop). */
+  mobileOnly?: boolean;
 }
 
 const NAV: NavItem[] = [
@@ -45,6 +49,7 @@ const NAV: NavItem[] = [
   { href: "/blog", label: "Blog", icon: BookOpen },
   { href: "/ressources", label: "Vidéos", icon: GraduationCap, desktopOnly: true },
   { href: "/badges", label: "Badges", icon: Award, desktopOnly: true },
+  { href: "/plus", label: "Plus", icon: LayoutGrid, mobileOnly: true },
   { href: "/parametres", label: "Paramètres", icon: Settings },
 ];
 
@@ -66,6 +71,15 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-svh bg-background lg:flex">
+      {/* Skip-to-main pour utilisateurs clavier / lecteur d'écran.
+          Visible uniquement quand focusé. */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-[100] focus:px-4 focus:py-2 focus:rounded-lg focus:bg-sousou-primary focus:text-white focus:shadow-lg"
+      >
+        Aller au contenu principal
+      </a>
+
       {/* Sidebar desktop */}
       <aside className="hidden lg:flex lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:flex-col lg:border-r lg:border-border/60 lg:bg-card lg:px-4 lg:py-6">
         <BrandMark size="md" className="mb-6 px-2" href="/dashboard" />
@@ -81,7 +95,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         )}
 
         <nav className="flex-1 space-y-1">
-          {NAV.map((item) => {
+          {NAV.filter((i) => !i.mobileOnly).map((item) => {
             const active = pathname?.startsWith(item.href);
             const Icon = item.icon;
             return (
@@ -91,7 +105,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors",
                   active
-                    ? "bg-sousou-primary-50 text-sousou-primary-700"
+                    ? "bg-sousou-primary-50 text-sousou-primary-700 dark:bg-sousou-primary/15 dark:text-sousou-primary"
                     : "text-sousou-neutral hover:bg-muted hover:text-sousou-secondary",
                 )}
               >
@@ -173,13 +187,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </header>
 
       {/* Contenu */}
-      <main className="flex-1 lg:pl-64 pb-20 lg:pb-6">
+      <main id="main-content" className="flex-1 lg:pl-64 pb-20 lg:pb-6">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
           {children}
         </div>
       </main>
 
-      {/* Bottom nav mobile : 5 onglets nav + avatar pour le profil */}
+      {/* Bottom nav mobile : 6 onglets. Le "Profil/Paramètres" reste
+          accessible via l'avatar en haut à droite du header mobile. */}
       <nav
         className="lg:hidden fixed inset-x-0 bottom-0 z-30 bg-card/95 backdrop-blur-md border-t border-border/60"
         aria-label="Navigation principale"
@@ -188,7 +203,10 @@ export function AppShell({ children }: { children: ReactNode }) {
           {NAV.filter(
             (i) => !i.desktopOnly && i.href !== "/parametres",
           ).map((item) => {
-            const active = pathname?.startsWith(item.href);
+            const active =
+              item.href === "/plus"
+                ? pathname === "/plus"
+                : pathname?.startsWith(item.href);
             const Icon = item.icon;
             return (
               <li key={item.href}>
@@ -209,33 +227,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </li>
             );
           })}
-          {/* Slot final : avatar utilisateur → profil */}
-          {user && (
-            <li>
-              <Link
-                href="/parametres"
-                className={cn(
-                  "flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors",
-                  pathname?.startsWith("/parametres")
-                    ? "text-sousou-primary"
-                    : "text-sousou-neutral hover:text-sousou-secondary",
-                )}
-              >
-                <span className="relative">
-                  <Avatar
-                    avatarUrl={user.avatarUrl}
-                    name={user.name}
-                    size="sm"
-                    bordered={pathname?.startsWith("/parametres")}
-                  />
-                  {hasPendingUnlock && <UnlockDot />}
-                </span>
-                <span className="text-[10px] font-semibold tracking-wide">
-                  Profil
-                </span>
-              </Link>
-            </li>
-          )}
         </ul>
       </nav>
 

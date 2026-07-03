@@ -97,7 +97,10 @@ export class AvatarUnlocksService implements OnModuleInit {
           userId,
           type: 'AVATAR_UNLOCKED',
           title: `Nouvel avatar : ${def.label}`,
-          body: def.description,
+          // Message de célébration — la condition (def.description) ne sert
+          // qu'à expliquer comment débloquer les avatars encore verrouillés
+          // dans la page "Mes avatars".
+          body: `Tu as débloqué l'avatar ${def.label} ! Va le sélectionner depuis tes paramètres pour l'utiliser.`,
           data: { avatarKey: def.key, label: def.label },
         });
       }

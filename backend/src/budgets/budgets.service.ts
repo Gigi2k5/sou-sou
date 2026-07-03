@@ -222,16 +222,25 @@ export class BudgetsService {
       ? NotifType.BUDGET_EXCEEDED
       : NotifType.BUDGET_WARNING;
 
-    const alreadySent = await this.prisma.notification.findFirst({
+    // Dédup safe : on récupère toutes les notifs du bon type du mois pour cet
+    // user (max quelques dizaines par mois), puis on filtre en JS sur data.budgetId.
+    // Plus robuste que Prisma `data: { path, equals }` qui peut ne pas matcher
+    // selon la version Postgres/Prisma.
+    const monthNotifs = await this.prisma.notification.findMany({
       where: {
         userId,
         type: targetType,
         createdAt: { gte: start },
-        // Le data est typed JSON ; on filtre via path sur budgetId.
-        data: { path: ['budgetId'], equals: budget.id },
       },
-      select: { id: true },
+      select: { data: true },
     });
+    const alreadySent = monthNotifs.some(
+      (n) =>
+        typeof n.data === 'object' &&
+        n.data !== null &&
+        !Array.isArray(n.data) &&
+        (n.data as Record<string, unknown>).budgetId === budget.id,
+    );
     if (alreadySent) return;
 
     const categoryName = budget.category.name;

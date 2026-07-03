@@ -23,7 +23,7 @@ export function BalanceHero({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: "easeOut" }}
-      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sousou-secondary to-sousou-secondary-light text-white p-6 sm:p-8 shadow-xl shadow-sousou-secondary/15"
+      className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e293b] to-[#334155] text-white p-6 sm:p-8 shadow-xl shadow-sousou-secondary/15"
     >
       {/* glows */}
       <div className="pointer-events-none absolute -top-24 -right-24 size-72 rounded-full bg-sousou-primary/30 blur-3xl" />
@@ -50,7 +50,7 @@ export function BalanceHero({
 
         <Image
           src="/mascot.png"
-          alt=""
+          alt="Mascotte Sou'Sou"
           width={80}
           height={80}
           className="hidden sm:block size-16 lg:size-20 drop-shadow-lg animate-[float_3s_ease-in-out_infinite]"

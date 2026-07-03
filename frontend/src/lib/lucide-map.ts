@@ -29,5 +29,17 @@ const ICONS: Record<string, LucideIcon> = {
 };
 
 export function getLucideIcon(name: string): LucideIcon {
-  return ICONS[name] ?? HelpCircle;
+  const icon = ICONS[name];
+  if (!icon) {
+    // Signale l'icône manquante en dev pour qu'on l'ajoute au mapping.
+    // Silent en prod pour ne pas polluer la console.
+    if (process.env.NODE_ENV !== "production") {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[lucide-map] Icône inconnue: "${name}" — fallback sur HelpCircle. Ajoute-la dans lib/lucide-map.ts.`,
+      );
+    }
+    return HelpCircle;
+  }
+  return icon;
 }

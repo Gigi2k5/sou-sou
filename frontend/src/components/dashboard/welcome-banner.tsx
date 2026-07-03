@@ -47,7 +47,7 @@ export function WelcomeBanner() {
           transition={{ duration: 0.3, ease: "easeOut" }}
           className="overflow-hidden"
         >
-          <div className="relative rounded-2xl bg-gradient-to-r from-sousou-primary-50 via-card to-sousou-primary-50 border border-sousou-primary/30 p-4 sm:p-5 pr-12 flex items-center gap-4">
+          <div className="relative rounded-2xl bg-gradient-to-r from-sousou-primary-50 via-card to-sousou-primary-50 dark:from-sousou-primary/10 dark:via-card dark:to-sousou-primary/10 border border-sousou-primary/30 p-4 sm:p-5 pr-12 flex items-center gap-4">
             <div className="size-10 sm:size-11 rounded-xl bg-sousou-primary text-white flex items-center justify-center shrink-0 shadow-md">
               <Gift className="size-5" />
             </div>

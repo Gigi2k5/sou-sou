@@ -12,7 +12,7 @@ export function GoalEmpty({ onCreate }: { onCreate: () => void }) {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="rounded-3xl bg-gradient-to-br from-sousou-primary-50 via-card to-card border border-border/60 p-8 sm:p-12 text-center"
+      className="rounded-3xl bg-gradient-to-br from-sousou-primary-50 via-card to-card dark:from-sousou-primary/10 dark:via-card dark:to-card border border-border/60 p-8 sm:p-12 text-center"
     >
       <div className="flex justify-center mb-6">
         <MascotAnimated mood="happy" size="lg" interactive disableConfetti />

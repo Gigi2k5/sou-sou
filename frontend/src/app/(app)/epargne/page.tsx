@@ -118,13 +118,24 @@ export default function EpargnePage() {
       badges.filter((b) => b.unlocked).map((b) => b.id),
     );
 
-    await refresh();
-
-    const [freshGoal, freshStats, freshBadges] = await Promise.all([
-      getGoal(),
-      getStats(),
-      listBadges(),
-    ]);
+    // Le refresh + les 3 fetchs suivants ne doivent pas faire planter
+    // silencieusement handleContributed (fire-and-forget côté dialog).
+    let freshGoal: SavingsGoal | null = null;
+    let freshStats: GamificationStats | null = null;
+    let freshBadges: UserBadgeFront[] = [];
+    try {
+      await refresh();
+      [freshGoal, freshStats, freshBadges] = await Promise.all([
+        getGoal(),
+        getStats(),
+        listBadges(),
+      ]);
+    } catch {
+      // Réseau flaky : on affiche quand même le toast principal en s'appuyant
+      // sur les valeurs snapshots.
+      toast.success(`+${formatMoney(paidAmount, currency)} épargnés`);
+      return;
+    }
 
     const pointsDiff =
       (freshStats?.totalPoints ?? 0) - (prevStats?.totalPoints ?? 0);
@@ -318,7 +329,7 @@ export default function EpargnePage() {
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-sousou-secondary to-sousou-secondary-light text-white p-6 sm:p-8 shadow-xl shadow-sousou-secondary/15"
+          className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#1e293b] to-[#334155] text-white p-6 sm:p-8 shadow-xl shadow-sousou-secondary/15"
         >
           <div className="pointer-events-none absolute -top-32 -right-24 size-72 rounded-full bg-sousou-primary/30 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-32 -left-16 size-72 rounded-full bg-sousou-tertiary/15 blur-3xl" />

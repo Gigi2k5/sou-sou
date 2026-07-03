@@ -161,7 +161,7 @@ export default function BudgetsPage() {
 
 function EmptyState({ onCreate }: { onCreate: () => void }) {
   return (
-    <div className="rounded-3xl border border-dashed border-border/60 bg-card p-8 sm:p-12 text-center">
+    <div className="rounded-3xl border border-dashed border-border/60 bg-card p-8 sm:p-12 text-center min-h-[60vh] flex flex-col items-center justify-center">
       <div className="flex justify-center mb-4">
         <MascotAnimated mood="thinking" size="md" disableConfetti />
       </div>

@@ -7,8 +7,11 @@ import { useEffect, useRef, useState } from "react";
  * Utilisé pour les chiffres clés du dashboard (balance, totaux).
  */
 export function useCountUp(target: number, duration = 700): number {
-  const [value, setValue] = useState(target);
-  const fromRef = useRef(target);
+  // Guard NaN/Infinity — sinon l'animation produit du NaN qui se propage aux
+  // consumers (balance, total cotisé, etc.). Défaut à 0 dans ces cas.
+  const safeTarget = Number.isFinite(target) ? target : 0;
+  const [value, setValue] = useState(safeTarget);
+  const fromRef = useRef(safeTarget);
   const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -19,11 +22,11 @@ export function useCountUp(target: number, duration = 700): number {
       const elapsed = now - start;
       const progress = Math.min(1, elapsed / duration);
       const eased = 1 - Math.pow(1 - progress, 3);
-      setValue(from + (target - from) * eased);
+      setValue(from + (safeTarget - from) * eased);
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(tick);
       } else {
-        fromRef.current = target;
+        fromRef.current = safeTarget;
       }
     }
 
@@ -31,7 +34,7 @@ export function useCountUp(target: number, duration = 700): number {
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [target, duration]);
+  }, [safeTarget, duration]);
 
   return value;
 }

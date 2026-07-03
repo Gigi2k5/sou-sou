@@ -32,6 +32,9 @@ function DialogContent({
           "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
           "w-[calc(100vw-2rem)] sm:max-w-md",
           "rounded-3xl bg-card text-card-foreground border border-border/60",
+          // overflow-hidden critique : sans ça, les enfants avec un bg coloré
+          // rectangulaire (notif non-lue, item highlight) débordent le rounded.
+          "overflow-hidden",
           "shadow-2xl shadow-sousou-secondary/20 outline-none",
           "transition-all duration-200",
           "data-[starting-style]:opacity-0 data-[starting-style]:scale-95",

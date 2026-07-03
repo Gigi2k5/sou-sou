@@ -213,9 +213,10 @@ export function RecurringTransactionDialog({
                 <Input
                   id="rt-amount"
                   type="number"
-                  inputMode="decimal"
+                  inputMode="numeric"
                   step="1"
                   min="0"
+                  placeholder="1000"
                   className="mt-1.5 text-xl tabular-nums"
                   aria-invalid={!!errors.amount || undefined}
                   {...register("amount")}
@@ -252,7 +253,7 @@ export function RecurringTransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {sources.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
+                      <SelectItem key={s.id} value={s.id} label={s.name}>
                         {s.name}
                       </SelectItem>
                     ))}
@@ -279,7 +280,7 @@ export function RecurringTransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
+                      <SelectItem key={c.id} value={c.id} label={c.name}>
                         {c.name}
                       </SelectItem>
                     ))}

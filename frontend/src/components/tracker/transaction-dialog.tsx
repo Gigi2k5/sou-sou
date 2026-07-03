@@ -152,7 +152,9 @@ export function TransactionDialog({
               ? values.expenseCategoryId || undefined
               : undefined,
         });
-        toast.success("Transaction ajoutée");
+        toast.success(
+          values.type === "EXPENSE" ? "Dépense ajoutée" : "Revenu ajouté",
+        );
       }
       onSaved();
       onOpenChange(false);
@@ -211,9 +213,10 @@ export function TransactionDialog({
                 <Input
                   id="amount"
                   type="number"
-                  inputMode="decimal"
-                  step="0.01"
+                  inputMode="numeric"
+                  step="1"
                   min="0"
+                  placeholder="1000"
                   className="mt-1.5 tabular-nums"
                   aria-invalid={!!errors.amount || undefined}
                   {...register("amount")}
@@ -253,11 +256,11 @@ export function TransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {categoryOptions.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
+                      <SelectItem key={c.id} value={c.id} label={c.name}>
                         <span className="flex items-center gap-2">
                           {c.name}
                           {c.kind === "SAVINGS" && (
-                            <span className="text-[10px] uppercase tracking-wide text-sousou-primary-700 bg-sousou-primary-50 rounded px-1.5 py-0.5">
+                            <span className="text-[10px] uppercase tracking-wide text-sousou-primary-700 bg-sousou-primary-50 dark:bg-sousou-primary/15 dark:text-sousou-primary rounded px-1.5 py-0.5">
                               Épargne
                             </span>
                           )}
@@ -308,7 +311,7 @@ export function TransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {sourceOptions.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
+                      <SelectItem key={s.id} value={s.id} label={s.name}>
                         {s.name}
                       </SelectItem>
                     ))}
@@ -334,6 +337,7 @@ export function TransactionDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={isSubmitting}
             >
               Annuler
             </Button>

@@ -136,6 +136,7 @@ export function ContributeDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
+              disabled={submitting}
             >
               Annuler
             </Button>

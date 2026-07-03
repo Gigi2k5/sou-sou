@@ -44,7 +44,7 @@ export function DashboardSavingsCard({ currency }: { currency: string }) {
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.05 }}
-        className="rounded-3xl bg-gradient-to-br from-sousou-primary-50 via-card to-card border border-border/60 p-5 sm:p-6 flex items-center gap-4"
+        className="rounded-3xl bg-gradient-to-br from-sousou-primary-50 via-card to-card dark:from-sousou-primary/10 dark:via-card dark:to-card border border-border/60 p-5 sm:p-6 flex items-center gap-4"
       >
         <div className="size-12 rounded-2xl bg-sousou-primary text-white flex items-center justify-center shrink-0">
           <PiggyBank className="size-6" />

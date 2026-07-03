@@ -141,65 +141,70 @@ export function RecurringTransactionsSection({
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: 0.04 * i }}
               className={cn(
-                "flex items-center gap-3 rounded-2xl border border-border/60 bg-card px-4 py-3",
+                "rounded-2xl border border-border/60 bg-card px-4 py-3",
                 !r.isActive && "opacity-60",
               )}
             >
-              <span
-                className={cn(
-                  "shrink-0 size-9 rounded-full inline-flex items-center justify-center",
-                  r.type === "INCOME"
-                    ? "bg-sousou-primary-50 text-sousou-primary-700"
-                    : "bg-sousou-tertiary-50 text-sousou-tertiary-700",
-                )}
-                aria-hidden="true"
-              >
-                {r.type === "INCOME" ? (
-                  <TrendingUp className="size-4" />
-                ) : (
-                  <TrendingDown className="size-4" />
-                )}
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm font-semibold text-sousou-secondary truncate">
-                    {r.note ||
-                      (r.type === "INCOME"
-                        ? r.incomeSource?.name ?? "Revenu mensuel"
-                        : r.expenseCategory?.name ?? "Dépense mensuelle")}
-                  </span>
-                  {!r.isActive && (
-                    <span className="text-[11px] font-semibold text-sousou-neutral bg-muted rounded-full px-2 py-0.5 shrink-0">
-                      en pause
-                    </span>
+              {/* Ligne principale : icône + label + montant */}
+              <div className="flex items-center gap-3">
+                <span
+                  className={cn(
+                    "shrink-0 size-9 rounded-full inline-flex items-center justify-center",
+                    r.type === "INCOME"
+                      ? "bg-sousou-primary-50 text-sousou-primary-700 dark:bg-sousou-primary/15 dark:text-sousou-primary"
+                      : "bg-sousou-tertiary/10 text-sousou-tertiary dark:bg-sousou-tertiary/20",
                   )}
+                  aria-hidden="true"
+                >
+                  {r.type === "INCOME" ? (
+                    <TrendingUp className="size-4" />
+                  ) : (
+                    <TrendingDown className="size-4" />
+                  )}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-sm font-semibold text-sousou-secondary truncate">
+                      {r.note ||
+                        (r.type === "INCOME"
+                          ? r.incomeSource?.name ?? "Revenu mensuel"
+                          : r.expenseCategory?.name ?? "Dépense mensuelle")}
+                    </span>
+                    {!r.isActive && (
+                      <span className="text-[11px] font-semibold text-sousou-neutral bg-muted rounded-full px-2 py-0.5 shrink-0">
+                        en pause
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-sousou-neutral mt-0.5 truncate">
+                    Le{" "}
+                    <strong className="text-sousou-secondary tabular-nums">
+                      {r.dayOfMonth}
+                    </strong>{" "}
+                    du mois
+                    {r.type === "INCOME" && r.incomeSource
+                      ? ` · ${r.incomeSource.name}`
+                      : null}
+                    {r.type === "EXPENSE" && r.expenseCategory
+                      ? ` · ${r.expenseCategory.name}`
+                      : null}
+                  </p>
                 </div>
-                <div className="text-xs text-sousou-neutral mt-0.5">
-                  Tous les{" "}
-                  <strong className="text-sousou-secondary tabular-nums">
-                    {r.dayOfMonth}
-                  </strong>{" "}
-                  du mois
-                  {r.type === "INCOME" && r.incomeSource
-                    ? ` · ${r.incomeSource.name}`
-                    : null}
-                  {r.type === "EXPENSE" && r.expenseCategory
-                    ? ` · ${r.expenseCategory.name}`
-                    : null}
-                </div>
+                <span
+                  className={cn(
+                    "text-sm font-semibold tabular-nums shrink-0",
+                    r.type === "INCOME"
+                      ? "text-sousou-primary"
+                      : "text-sousou-tertiary",
+                  )}
+                >
+                  {r.type === "INCOME" ? "+" : "-"}
+                  {formatMoney(r.amount, currency)}
+                </span>
               </div>
-              <span
-                className={cn(
-                  "text-sm font-semibold tabular-nums shrink-0",
-                  r.type === "INCOME"
-                    ? "text-sousou-primary"
-                    : "text-sousou-tertiary",
-                )}
-              >
-                {r.type === "INCOME" ? "+" : "-"}
-                {formatMoney(r.amount, currency)}
-              </span>
-              <div className="flex items-center gap-0.5 shrink-0">
+              {/* Ligne actions : sous le contenu sur mobile étroit — donne
+                  suffisamment d'espace au label + montant. */}
+              <div className="flex items-center justify-end gap-0.5 mt-1.5 -mr-1">
                 <IconButton
                   ariaLabel={r.isActive ? "Mettre en pause" : "Reprendre"}
                   onClick={() => togglePause(r)}

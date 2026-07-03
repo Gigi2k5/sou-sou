@@ -6,6 +6,10 @@ const API_URL =
 export const api: AxiosInstance = axios.create({
   baseURL: `${API_URL}/api`,
   withCredentials: true,
+  // 20 s : suffisant pour un cold start Render Free (le service peut mettre
+  // ~15 s à se réveiller), mais empêche les requêtes qui pendent à l'infini
+  // sur un réseau mort.
+  timeout: 20_000,
   headers: { "Content-Type": "application/json" },
 });
 
