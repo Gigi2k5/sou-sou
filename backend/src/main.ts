@@ -4,6 +4,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import cookieParser from 'cookie-parser';
+import { json, urlencoded } from 'express';
 import helmet from 'helmet';
 import { join } from 'node:path';
 
@@ -17,6 +18,11 @@ async function bootstrap() {
   // front (port 3100) à charger les avatars uploadés depuis le back (4100).
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cookieParser());
+
+  // Body parser limit — les avatars sont envoyés en data URL base64 (jusqu'à
+  // 2 MB de source → ~2.7 MB encodés). Défaut Express = 100 KB, trop juste.
+  app.use(json({ limit: '5mb' }));
+  app.use(urlencoded({ extended: true, limit: '5mb' }));
 
   // Avatars uploadés (et autres uploads futurs) servis en statique sous /uploads
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });
