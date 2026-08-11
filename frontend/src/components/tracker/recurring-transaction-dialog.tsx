@@ -243,6 +243,7 @@ export function RecurringTransactionDialog({
               <div>
                 <Label htmlFor="rt-source">Source de revenu (optionnel)</Label>
                 <Select
+                  items={sources.map((s) => ({ value: s.id, label: s.name }))}
                   value={watch("incomeSourceId") || ""}
                   onValueChange={(v) =>
                     setValue("incomeSourceId", v ?? "", { shouldDirty: true })
@@ -268,6 +269,10 @@ export function RecurringTransactionDialog({
                   Catégorie de dépense (optionnel)
                 </Label>
                 <Select
+                  items={categories.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                  }))}
                   value={watch("expenseCategoryId") || ""}
                   onValueChange={(v) =>
                     setValue("expenseCategoryId", v ?? "", {

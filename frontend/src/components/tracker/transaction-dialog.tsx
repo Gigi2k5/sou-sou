@@ -240,6 +240,13 @@ export function TransactionDialog({
               <div>
                 <Label>Catégorie</Label>
                 <Select
+                  // items = source de vérité que base-ui utilise pour résoudre
+                  // le label de la value sélectionnée dans le SelectValue du
+                  // trigger. Sans ça, le trigger affiche l'UUID brut.
+                  items={categoryOptions.map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                  }))}
                   value={watch("expenseCategoryId") ?? ""}
                   onValueChange={(v) =>
                     setValue("expenseCategoryId", String(v ?? ""))
@@ -293,6 +300,10 @@ export function TransactionDialog({
               <div>
                 <Label>Source</Label>
                 <Select
+                  items={sourceOptions.map((s) => ({
+                    value: s.id,
+                    label: s.name,
+                  }))}
                   value={watch("incomeSourceId") ?? ""}
                   onValueChange={(v) =>
                     setValue("incomeSourceId", String(v ?? ""))
