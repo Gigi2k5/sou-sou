@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Upload, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { FieldError } from "@/components/auth/field-error";
@@ -9,8 +10,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { extractApiErrorMessage } from "@/lib/api";
-import { createArticle, updateArticle } from "@/lib/content-api";
+import { readFileAsDataUrl } from "@/lib/avatar";
+import {
+  createArticle,
+  updateArticle,
+  uploadArticleCover,
+} from "@/lib/content-api";
 import type { Article } from "@/types/content";
+
+const MAX_COVER_BYTES = 5 * 1024 * 1024;
+const ALLOWED_COVER_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 export function ArticleForm({
   initial,
@@ -24,6 +33,8 @@ export function ArticleForm({
   const [coverImage, setCoverImage] = useState(initial?.coverImage ?? "");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (initial) {
@@ -45,6 +56,38 @@ export function ArticleForm({
       e.coverImage = "URL invalide";
     setErrors(e);
     return Object.keys(e).length === 0;
+  }
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!ALLOWED_COVER_TYPES.includes(file.type)) {
+      toast.error("Format non supporté. Utilise JPG, PNG ou WEBP.");
+      return;
+    }
+    if (file.size > MAX_COVER_BYTES) {
+      toast.error(
+        `Image trop lourde (${(file.size / 1_048_576).toFixed(1)} MB). Max 5 MB.`,
+      );
+      return;
+    }
+    setUploading(true);
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const { url } = await uploadArticleCover(dataUrl);
+      setCoverImage(url);
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.coverImage;
+        return next;
+      });
+      toast.success("Image uploadée");
+    } catch (err) {
+      toast.error(extractApiErrorMessage(err, "Upload impossible"));
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -91,17 +134,61 @@ export function ArticleForm({
       </div>
 
       <div>
-        <Label htmlFor="cover">Image de couverture (URL, optionnel)</Label>
-        <Input
-          id="cover"
-          type="url"
-          value={coverImage}
-          onChange={(e) => setCoverImage(e.target.value)}
-          placeholder="https://example.com/cover.jpg"
-          className="mt-1.5"
-          aria-invalid={!!errors.coverImage || undefined}
-        />
+        <Label htmlFor="cover">Image de couverture (optionnel)</Label>
+        <div className="mt-1.5 flex flex-col sm:flex-row gap-2">
+          <Input
+            id="cover"
+            type="url"
+            value={coverImage}
+            onChange={(e) => setCoverImage(e.target.value)}
+            placeholder="https://exemple.com/cover.jpg — ou upload"
+            className="flex-1"
+            aria-invalid={!!errors.coverImage || undefined}
+          />
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploading}
+            className="sm:w-auto"
+          >
+            <Upload className="size-4" />
+            {uploading ? "Upload..." : "Uploader"}
+          </Button>
+        </div>
+        <p className="mt-1 text-xs text-sousou-neutral">
+          Colle une URL, ou uploade un JPG / PNG / WEBP (5 MB max).
+        </p>
         <FieldError message={errors.coverImage} />
+
+        {coverImage && !uploading && (
+          <div className="mt-3 relative inline-block">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverImage}
+              alt="Aperçu couverture"
+              className="max-h-32 rounded-xl border border-border/60 object-cover"
+              onError={() => {
+                // Ne rien faire — le validate() attrape déjà les URLs invalides.
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setCoverImage("")}
+              className="absolute -top-2 -right-2 size-6 rounded-full bg-sousou-secondary text-white flex items-center justify-center shadow-md hover:bg-sousou-tertiary transition-colors"
+              aria-label="Retirer l'image"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       <div>
@@ -123,7 +210,7 @@ export function ArticleForm({
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
-        <Button type="submit" size="lg" disabled={submitting}>
+        <Button type="submit" size="lg" disabled={submitting || uploading}>
           {submitting
             ? "Publication..."
             : initial

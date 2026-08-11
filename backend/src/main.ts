@@ -19,10 +19,11 @@ async function bootstrap() {
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   app.use(cookieParser());
 
-  // Body parser limit — les avatars sont envoyés en data URL base64 (jusqu'à
-  // 2 MB de source → ~2.7 MB encodés). Défaut Express = 100 KB, trop juste.
-  app.use(json({ limit: '5mb' }));
-  app.use(urlencoded({ extended: true, limit: '5mb' }));
+  // Body parser limit — les images (avatars 2 MB, covers d'article 5 MB) sont
+  // envoyées en data URL base64, ce qui ajoute ~33% de padding. On garde une
+  // marge confortable pour éviter les faux positifs. Défaut Express = 100 KB.
+  app.use(json({ limit: '8mb' }));
+  app.use(urlencoded({ extended: true, limit: '8mb' }));
 
   // Avatars uploadés (et autres uploads futurs) servis en statique sous /uploads
   app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads' });

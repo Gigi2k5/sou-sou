@@ -56,6 +56,19 @@ export async function deleteArticle(id: string): Promise<void> {
   await api.delete(`/articles/${id}`);
 }
 
+/**
+ * Upload une image de couverture sur Cloudinary via le backend et retourne
+ * son URL publique. À poser ensuite dans le champ `coverImage` du form.
+ */
+export async function uploadArticleCover(
+  dataUrl: string,
+): Promise<{ url: string }> {
+  const { data } = await api.post<{ url: string }>("/articles/upload-cover", {
+    dataUrl,
+  });
+  return data;
+}
+
 // --- Likes & Comments (V4) -------------------------------------------------
 
 export async function likeArticle(id: string): Promise<ArticleLikeStatus> {

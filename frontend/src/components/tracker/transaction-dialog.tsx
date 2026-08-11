@@ -256,20 +256,18 @@ export function TransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {categoryOptions.map((c) => (
-                      <SelectItem key={c.id} value={c.id} label={c.name}>
-                        <span className="flex items-center gap-2">
-                          {c.name}
-                          {c.kind === "SAVINGS" && (
-                            <span className="text-[10px] uppercase tracking-wide text-sousou-primary-700 bg-sousou-primary-50 dark:bg-sousou-primary/15 dark:text-sousou-primary rounded px-1.5 py-0.5">
-                              Épargne
-                            </span>
-                          )}
-                          {c.kind === "POT" && (
-                            <span className="text-[10px] uppercase tracking-wide text-violet-700 dark:text-violet-200 bg-violet-100 dark:bg-violet-900/40 rounded px-1.5 py-0.5">
-                              Pot
-                            </span>
-                          )}
-                        </span>
+                      <SelectItem key={c.id} value={c.id}>
+                        {c.name}
+                        {c.kind === "SAVINGS" && (
+                          <span className="text-[10px] uppercase tracking-wide text-sousou-primary-700 bg-sousou-primary-50 dark:bg-sousou-primary/15 dark:text-sousou-primary rounded px-1.5 py-0.5">
+                            Épargne
+                          </span>
+                        )}
+                        {c.kind === "POT" && (
+                          <span className="text-[10px] uppercase tracking-wide text-violet-700 dark:text-violet-200 bg-violet-100 dark:bg-violet-900/40 rounded px-1.5 py-0.5">
+                            Pot
+                          </span>
+                        )}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -311,7 +309,7 @@ export function TransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {sourceOptions.map((s) => (
-                      <SelectItem key={s.id} value={s.id} label={s.name}>
+                      <SelectItem key={s.id} value={s.id}>
                         {s.name}
                       </SelectItem>
                     ))}

@@ -60,18 +60,28 @@ function SelectContent({
   );
 }
 
+/**
+ * Convention de children :
+ * - Le **premier** enfant est le label texte (nom de la catégorie/source…) :
+ *   il va dans `<ItemText>`, ce qui permet à base-ui d'afficher le bon texte
+ *   dans le trigger quand l'item est sélectionné. Sans ça, base-ui fall-back
+ *   sur la value (l'UUID) et le trigger affiche un id illisible.
+ * - Les enfants **suivants** (badges, icônes…) sont rendus côte-à-côte du
+ *   ItemText mais restent en dehors — ils n'influent pas sur le trigger.
+ *
+ * Usage :
+ *   <SelectItem value={c.id}>
+ *     {c.name}                              // label
+ *     {c.kind === "SAVINGS" && <Badge/>}    // extra
+ *   </SelectItem>
+ */
 function SelectItem({
   className,
   children,
-  label,
   ...props
-}: React.ComponentProps<typeof SelectPrimitive.Item> & {
-  /** Label texte affiché dans le trigger quand l'item est sélectionné.
-   *  Obligatoire si `children` contient autre chose qu'une simple string
-   *  (badges, icônes) — sinon base-ui ne peut pas extraire le label et
-   *  fall-back sur la value (l'id UUID). */
-  label?: string;
-}) {
+}: React.ComponentProps<typeof SelectPrimitive.Item>) {
+  const childArray = React.Children.toArray(children);
+  const [label, ...extras] = childArray;
   return (
     <SelectPrimitive.Item
       className={cn(
@@ -81,13 +91,13 @@ function SelectItem({
         "dark:data-[highlighted]:bg-sousou-primary/15 dark:data-[highlighted]:text-sousou-primary",
         className,
       )}
-      label={label}
       {...props}
     >
+      <SelectPrimitive.ItemText>{label}</SelectPrimitive.ItemText>
+      {extras}
       <SelectPrimitive.ItemIndicator className="ml-auto">
         <Check className="size-4 text-sousou-primary" />
       </SelectPrimitive.ItemIndicator>
-      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
     </SelectPrimitive.Item>
   );
 }

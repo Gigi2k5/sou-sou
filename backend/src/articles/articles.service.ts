@@ -7,6 +7,7 @@ import { Prisma, Role } from '@prisma/client';
 
 import { AvatarUnlocksService } from '../avatar-unlocks/avatar-unlocks.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { uploadArticleCover } from './cover-image';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { ListArticlesDto } from './dto/list-articles.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
@@ -193,6 +194,16 @@ export class ArticlesService {
     });
     const [decorated] = await attachLikedByMe(this.prisma, user.id, [updated]);
     return decorated;
+  }
+
+  /**
+   * Upload une image de couverture d'article sur Cloudinary et retourne son URL
+   * publique. Le front pose ensuite cette URL dans le champ `coverImage` du
+   * formulaire d'article — ce qui persiste comme n'importe quelle URL externe.
+   */
+  async uploadCover(authorId: string, dataUrl: string): Promise<{ url: string }> {
+    const url = await uploadArticleCover(authorId, dataUrl);
+    return { url };
   }
 
   async remove(user: { id: string; role: Role }, id: string) {

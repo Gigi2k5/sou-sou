@@ -253,7 +253,7 @@ export function RecurringTransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {sources.map((s) => (
-                      <SelectItem key={s.id} value={s.id} label={s.name}>
+                      <SelectItem key={s.id} value={s.id}>
                         {s.name}
                       </SelectItem>
                     ))}
@@ -280,7 +280,7 @@ export function RecurringTransactionDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id} label={c.name}>
+                      <SelectItem key={c.id} value={c.id}>
                         {c.name}
                       </SelectItem>
                     ))}

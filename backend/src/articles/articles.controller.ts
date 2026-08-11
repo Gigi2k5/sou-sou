@@ -21,6 +21,7 @@ import { ArticlesService } from './articles.service';
 import { CreateArticleDto } from './dto/create-article.dto';
 import { ListArticlesDto } from './dto/list-articles.dto';
 import { UpdateArticleDto } from './dto/update-article.dto';
+import { UploadCoverDto } from './dto/upload-cover.dto';
 
 @ApiTags('articles')
 @ApiCookieAuth('access_token')
@@ -44,6 +45,16 @@ export class ArticlesController {
   @ApiOperation({ summary: 'Créer un article (auto-publié)' })
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateArticleDto) {
     return this.service.create(user.id, dto);
+  }
+
+  @Post('upload-cover')
+  @ApiOperation({
+    summary: 'Uploader une image de couverture (Cloudinary)',
+    description:
+      'Prend une image en data URL base64, la redimensionne/compresse, upload sur Cloudinary. Retourne l\'URL publique à poser dans `coverImage`.',
+  })
+  uploadCover(@CurrentUser() user: AuthUser, @Body() dto: UploadCoverDto) {
+    return this.service.uploadCover(user.id, dto.dataUrl);
   }
 
   @Patch(':id')

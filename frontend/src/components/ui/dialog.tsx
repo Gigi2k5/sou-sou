@@ -32,9 +32,14 @@ function DialogContent({
           "fixed left-1/2 top-1/2 z-50 -translate-x-1/2 -translate-y-1/2",
           "w-[calc(100vw-2rem)] sm:max-w-md",
           "rounded-3xl bg-card text-card-foreground border border-border/60",
-          // overflow-hidden critique : sans ça, les enfants avec un bg coloré
-          // rectangulaire (notif non-lue, item highlight) débordent le rounded.
-          "overflow-hidden",
+          // Cap la hauteur du dialog à celle du viewport (moins un peu de marge)
+          // et laisse scroller le contenu. `svh` = small viewport height,
+          // évite que les URL bars mobiles rognent le contenu accessible.
+          "max-h-[calc(100svh-2rem)] sm:max-h-[calc(100svh-4rem)]",
+          // overflow-y-auto : scroll vertical si le contenu déborde.
+          // overflow-x-hidden : préserve les corners rounded (les enfants avec
+          // bg coloré ne débordent pas horizontalement).
+          "overflow-y-auto overflow-x-hidden",
           "shadow-2xl shadow-sousou-secondary/20 outline-none",
           "transition-all duration-200",
           "data-[starting-style]:opacity-0 data-[starting-style]:scale-95",
