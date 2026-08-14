@@ -94,7 +94,10 @@ export function OnboardingModal() {
       <div
         className={cn(
           "fixed inset-0 z-[60] flex items-center justify-center",
-          "bg-sousou-secondary/40 dark:bg-black/60 backdrop-blur-sm",
+          // Backdrop branded opaque : dégradé navy → primary. Isole
+          // l'onboarding comme un moment "premier contact" — plus de fuite
+          // visuelle vers le dashboard qui n'a encore rien à montrer.
+          "bg-gradient-to-br from-sousou-secondary via-[#1a2f45] to-sousou-primary-700",
         )}
         role="dialog"
         aria-modal="true"

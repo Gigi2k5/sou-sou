@@ -32,6 +32,9 @@ import { useAuth } from "@/providers/auth-provider";
 interface NavItem {
   href: string;
   label: string;
+  /** Label court affiché dans le bottom-nav mobile (place limitée).
+   *  Fallback sur `label` si non spécifié. */
+  shortLabel?: string;
   icon: typeof LayoutDashboard;
   /** Caché du bottom-nav mobile (mais visible dans la sidebar desktop et /plus). */
   desktopOnly?: boolean;
@@ -40,12 +43,12 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/transactions", label: "Transactions", icon: Receipt },
+  { href: "/dashboard", label: "Dashboard", shortLabel: "Accueil", icon: LayoutDashboard },
+  { href: "/transactions", label: "Transactions", shortLabel: "Suivi", icon: Receipt },
   { href: "/budgets", label: "Budgets", icon: Wallet, desktopOnly: true },
   { href: "/insights", label: "Analyses", icon: Sparkles, desktopOnly: true },
   { href: "/epargne", label: "Épargne", icon: PiggyBank },
-  { href: "/cotisations", label: "Cotisations", icon: Target },
+  { href: "/cotisations", label: "Cotisations", shortLabel: "Cotise", icon: Target },
   { href: "/blog", label: "Blog", icon: BookOpen },
   { href: "/ressources", label: "Vidéos", icon: GraduationCap, desktopOnly: true },
   { href: "/badges", label: "Badges", icon: Award, desktopOnly: true },
@@ -208,20 +211,28 @@ export function AppShell({ children }: { children: ReactNode }) {
                 ? pathname === "/plus"
                 : pathname?.startsWith(item.href);
             const Icon = item.icon;
+            const displayLabel = item.shortLabel ?? item.label;
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  aria-label={item.label}
                   className={cn(
-                    "flex flex-col items-center justify-center gap-0.5 py-2.5 transition-colors",
+                    "flex flex-col items-center justify-center gap-1 py-2 transition-colors",
                     active
                       ? "text-sousou-primary"
                       : "text-sousou-neutral hover:text-sousou-secondary",
                   )}
                 >
-                  <Icon className="size-5" />
-                  <span className="text-[10px] font-semibold tracking-wide">
-                    {item.label}
+                  {/* Container fixe : toutes les icônes occupent la même
+                      "boîte" visuelle (24×24), quelle que soit la forme de
+                      l'icône elle-même (rond, carré, etc.). Harmonise le
+                      rendu perçu. */}
+                  <span className="inline-flex items-center justify-center size-6">
+                    <Icon className="size-5" strokeWidth={active ? 2.25 : 2} />
+                  </span>
+                  <span className="text-[10px] font-semibold tracking-wide leading-none">
+                    {displayLabel}
                   </span>
                 </Link>
               </li>
