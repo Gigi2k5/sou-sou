@@ -13,12 +13,20 @@ import {
 } from "react";
 
 import { api } from "@/lib/api";
-import type { AuthUser } from "@/lib/auth-schemas";
+import type { AuthUser, SignupResult } from "@/lib/auth-schemas";
 
 interface AuthContextValue {
   user: AuthUser | null;
   loading: boolean;
-  signup: (input: { email: string; password: string; name: string }) => Promise<AuthUser>;
+  /** Crée le compte et déclenche l'envoi du code — ne connecte pas. */
+  signup: (input: {
+    email: string;
+    password: string;
+    name: string;
+  }) => Promise<SignupResult>;
+  /** Valide le code reçu par email et connecte dans la foulée. */
+  verifyEmail: (input: { email: string; code: string }) => Promise<AuthUser>;
+  resendVerification: (email: string) => Promise<void>;
   login: (input: { email: string; password: string }) => Promise<AuthUser>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -61,10 +69,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user, setTheme]);
 
   const signup = useCallback<AuthContextValue["signup"]>(async (input) => {
-    const { data } = await api.post<{ user: AuthUser }>("/auth/signup", input);
-    setUser(data.user);
-    return data.user;
+    // Pas de setUser ici : tant que le code n'est pas validé, aucune session.
+    const { data } = await api.post<SignupResult>("/auth/signup", input);
+    return data;
   }, []);
+
+  const verifyEmail = useCallback<AuthContextValue["verifyEmail"]>(
+    async (input) => {
+      const { data } = await api.post<{ user: AuthUser }>(
+        "/auth/verify-email",
+        input,
+      );
+      setUser(data.user);
+      return data.user;
+    },
+    [],
+  );
+
+  const resendVerification = useCallback<AuthContextValue["resendVerification"]>(
+    async (email) => {
+      await api.post("/auth/resend-verification", { email });
+    },
+    [],
+  );
 
   const login = useCallback<AuthContextValue["login"]>(async (input) => {
     const { data } = await api.post<{ user: AuthUser }>("/auth/login", input);
@@ -85,8 +112,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchMe]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, loading, signup, login, logout, refresh }),
-    [user, loading, signup, login, logout, refresh],
+    () => ({
+      user,
+      loading,
+      signup,
+      verifyEmail,
+      resendVerification,
+      login,
+      logout,
+      refresh,
+    }),
+    [
+      user,
+      loading,
+      signup,
+      verifyEmail,
+      resendVerification,
+      login,
+      logout,
+      refresh,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

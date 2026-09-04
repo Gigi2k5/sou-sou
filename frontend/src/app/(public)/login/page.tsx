@@ -12,7 +12,7 @@ import { FieldError } from "@/components/auth/field-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { extractApiErrorMessage } from "@/lib/api";
+import { extractApiErrorCode, extractApiErrorMessage } from "@/lib/api";
 import { type LoginValues, loginSchema } from "@/lib/auth-schemas";
 import { useAuth } from "@/providers/auth-provider";
 
@@ -37,6 +37,13 @@ export default function LoginPage() {
       toast.success("Bienvenue !");
       router.push(u.role === "ADMIN" ? "/admin" : "/");
     } catch (err) {
+      // Compte créé mais jamais vérifié : on renvoie vers la saisie du code
+      // plutôt que d'afficher une erreur dans laquelle l'user est coincé.
+      if (extractApiErrorCode(err) === "EMAIL_NOT_VERIFIED") {
+        toast.info("Vérifie ton email pour activer ton compte.");
+        router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
+        return;
+      }
       toast.error(extractApiErrorMessage(err, "Connexion impossible"));
     } finally {
       setSubmitting(false);

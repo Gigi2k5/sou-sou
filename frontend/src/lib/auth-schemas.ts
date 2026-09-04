@@ -45,6 +45,15 @@ export const resetPasswordSchema = z
 
 export type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
+export const verifyEmailSchema = z.object({
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Le code fait 6 chiffres"),
+});
+
+export type VerifyEmailValues = z.infer<typeof verifyEmailSchema>;
+
 // --- API types ---------------------------------------------------------------
 export interface AuthUser {
   id: string;
@@ -63,5 +72,13 @@ export interface AuthUser {
   hasCompletedOnboarding: boolean;
   /** Step en cours (0-N). Permet de reprendre où on s'était arrêté. */
   onboardingStep: number;
+  /** Email confirmé via le code à 6 chiffres (backfillé true pour les comptes pré-V5). */
+  emailVerified: boolean;
   createdAt: string;
+}
+
+/** Réponse de POST /auth/signup — aucun token tant que le code n'est pas validé. */
+export interface SignupResult {
+  email: string;
+  expiresInMinutes: number;
 }

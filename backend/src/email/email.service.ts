@@ -59,6 +59,66 @@ export class EmailService {
     }
   }
 
+  async sendVerificationCode(
+    to: string,
+    name: string,
+    code: string,
+    ttlMinutes: number,
+  ): Promise<void> {
+    const subject = "Sou'Sou — Ton code de vérification";
+    const htmlContent = this.buildVerificationHtml(name, code, ttlMinutes);
+
+    if (!this.client) {
+      this.logger.log(`📧 [DEV] Code de vérification pour ${to}: ${code}`);
+      return;
+    }
+
+    try {
+      await this.client.transactionalEmails.sendTransacEmail({
+        subject,
+        htmlContent,
+        sender: { name: this.senderName, email: this.senderEmail },
+        to: [{ email: to, name }],
+      });
+      this.logger.log(`Code de vérification envoyé à ${to}`);
+    } catch (err) {
+      this.logger.error(
+        `Échec envoi code de vérification à ${to}`,
+        err instanceof Error ? err.stack : String(err),
+      );
+      throw err;
+    }
+  }
+
+  private buildVerificationHtml(
+    name: string,
+    code: string,
+    ttlMinutes: number,
+  ): string {
+    return `
+<!DOCTYPE html>
+<html lang="fr">
+  <body style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; background:#F8FAFC; padding:32px; color:#1E293B;">
+    <div style="max-width:560px; margin:0 auto; background:#FFFFFF; border-radius:16px; padding:32px;">
+      <h1 style="color:#10B981; font-family: 'Newsreader', Georgia, serif; margin-top:0;">Sou'Sou</h1>
+      <p>Salut ${this.escape(name)},</p>
+      <p>Bienvenue ! Voici ton code de vérification pour activer ton compte :</p>
+      <p style="text-align:center; margin:32px 0;">
+        <span style="display:inline-block; background:#F8FAFC; border:2px dashed #10B981; border-radius:12px; padding:16px 32px; font-size:32px; font-weight:700; letter-spacing:8px; color:#1E293B;">
+          ${this.escape(code)}
+        </span>
+      </p>
+      <p style="text-align:center; font-size:13px; color:#717973;">
+        Ce code est valide pendant ${ttlMinutes} minutes.
+      </p>
+      <p style="font-size:13px; color:#717973;">
+        Si tu n'es pas à l'origine de cette inscription, ignore simplement cet email.
+      </p>
+    </div>
+  </body>
+</html>`.trim();
+  }
+
   private buildResetHtml(name: string, resetUrl: string): string {
     return `
 <!DOCTYPE html>

@@ -11,7 +11,7 @@ Web app de gestion financière personnelle gamifiée pour jeunes adultes (18-40 
 | Frontend   | Next.js 16 (App Router) · TypeScript · Tailwind 4 · shadcn/ui (base-nova / @base-ui) · framer-motion · recharts · react-hook-form + zod · react-markdown |
 | Backend    | NestJS 11 · TypeScript · Prisma 6 · PostgreSQL 16 · JWT (httpOnly cookies) · class-validator |
 | Infra dev  | Docker Compose (Postgres + pgAdmin)                                     |
-| Email      | Brevo API (reset password)                                              |
+| Email      | Brevo API (vérification de compte + reset password)                     |
 | Tests      | Jest (backend, 44 tests sur fonctions pures et gamification)            |
 
 ## 📁 Arborescence
@@ -20,14 +20,14 @@ Web app de gestion financière personnelle gamifiée pour jeunes adultes (18-40 
 sou-sou/
 ├── frontend/              # Next.js (port 3100)
 │   └── src/
-│       ├── app/(public)/  # landing, login, signup, forgot/reset-password
+│       ├── app/(public)/  # landing, login, signup, verify-email, forgot/reset-password
 │       ├── app/(app)/     # dashboard, transactions, epargne, badges, blog, ressources, parametres
 │       ├── components/    # ui (shadcn base-nova) + tracker + savings + content + app-shell
 │       ├── lib/           # api client (axios + interceptor refresh)
 │       └── providers/     # AuthProvider
 ├── backend/               # NestJS (port 4100)
 │   └── src/
-│       ├── auth/          # signup/login/refresh/logout/me + forgot/reset
+│       ├── auth/          # signup/login/refresh/logout/me + verify-email/resend + forgot/reset
 │       ├── users/         # PATCH /users/me
 │       ├── income-sources, expense-categories, transactions/  # tracker
 │       ├── savings-goal, contributions/                       # épargne
@@ -90,7 +90,7 @@ npm run dev                # http://localhost:3100
 | `JWT_ACCESS_TTL`     | Format `15m`, `1h`, `30s`...              |
 | `JWT_REFRESH_TTL`    | Idem                                     |
 | `COOKIE_SECURE`      | `false` en dev, `true` en prod           |
-| `BREVO_API_KEY`      | Clé API Brevo. Vide → emails loggés en console |
+| `BREVO_API_KEY`      | Clé API Brevo. Vide → emails **et codes de vérification** loggés en console (pratique en dev) |
 | `BREVO_SENDER_EMAIL` | Email expéditeur Brevo                   |
 | `FRONTEND_URL`       | `http://localhost:3100` en dev           |
 
@@ -104,6 +104,27 @@ npm run dev                # http://localhost:3100
 ## 🔐 Authentification
 
 JWT en cookies httpOnly, refresh token opaque (random 48B hash sha256 stocké en DB), rotation à chaque refresh, throttling sur signup/login/forgot.
+
+### Vérification de l'email (code à 6 chiffres)
+
+Le signup **ne connecte plus** : il crée le compte avec `emailVerified = false` et envoie un
+code à 6 chiffres par email. Aucun token n'est émis tant que le code n'est pas validé.
+
+| Étape | Route | Comportement |
+| ----- | ----- | ------------ |
+| 1 | `POST /auth/signup` | Crée le compte, envoie le code. Renvoie `{ email, expiresInMinutes }`, **sans cookies**. |
+| 2 | `POST /auth/verify-email` | Valide `{ email, code }` → pose les cookies et connecte directement. |
+| — | `POST /auth/resend-verification` | Renvoie un code. Cooldown de 60 s, silencieux si email inconnu ou déjà vérifié. |
+| — | `POST /auth/login` | Sur compte non vérifié : **403** avec `code: "EMAIL_NOT_VERIFIED"` → le front redirige vers `/verify-email`. |
+
+Garde-fous :
+- Code **hashé en SHA-256** en base (jamais stocké en clair), TTL **15 min**.
+- **5 essais** max par code ; au-delà il est invalidé, même si le bon code est ensuite saisi.
+- Throttling : 10 req/min sur `verify-email`, 3 req/min sur `resend-verification`.
+- Un renvoi de code remet le compteur d'essais à zéro.
+
+Les comptes créés **avant** cette fonctionnalité sont backfillés `emailVerified = true` par la
+migration `20260904100000_email_verification` — personne ne se retrouve lock-out.
 
 **Promouvoir un user en admin** (pour gérer les ressources YouTube) :
 
@@ -136,7 +157,7 @@ L'app est conçue **mobile-first** avec bottom nav 5 onglets (Dashboard, Transac
 
 ```bash
 cd backend
-npm test                   # 44 tests sur slug, youtube, parseDuration, gamification
+npm test                   # 146 tests (slug, youtube, parseDuration, gamification, code de vérification)
 ```
 
 ## 🏗️ Architecture

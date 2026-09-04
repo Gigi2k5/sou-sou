@@ -62,6 +62,18 @@ api.interceptors.response.use(
 );
 
 // --- Helpers -----------------------------------------------------------------
+/**
+ * Code métier renvoyé par le backend dans le body d'erreur (ex. "EMAIL_NOT_VERIFIED").
+ * Permet de réagir sur le cas plutôt que sur le message affiché.
+ */
+export function extractApiErrorCode(err: unknown): string | null {
+  if (axios.isAxiosError(err)) {
+    const data = err.response?.data as { code?: string } | undefined;
+    return data?.code ?? null;
+  }
+  return null;
+}
+
 export function extractApiErrorMessage(err: unknown, fallback: string): string {
   if (axios.isAxiosError(err)) {
     const data = err.response?.data as { message?: string | string[] } | undefined;

@@ -44,6 +44,18 @@ model User {
   resetToken          String?   @unique
   resetTokenExpiresAt DateTime?
 
+  /// Vérification email — code à 6 chiffres envoyé au signup.
+  /// Tant que `emailVerified` est false, le login est refusé (403).
+  /// Backfillé `true` pour tous les comptes existants au déploiement.
+  emailVerified             Boolean   @default(false)
+  /// SHA-256 du code — jamais stocké en clair (même logique que RefreshToken).
+  verificationCodeHash      String?
+  verificationCodeExpiresAt DateTime?
+  /// Essais ratés sur le code courant — au-delà du max, le code est invalidé.
+  verificationAttempts      Int       @default(0)
+  /// Dernier envoi — sert au cooldown anti-spam sur le renvoi.
+  verificationCodeSentAt    DateTime?
+
   // Modération
   isBanned    Boolean   @default(false)
   banReason   String?

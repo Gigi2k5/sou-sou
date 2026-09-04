@@ -33,13 +33,14 @@ export default function SignupPage() {
   async function onSubmit(values: SignupValues) {
     setSubmitting(true);
     try {
-      await signup({
+      const { email } = await signup({
         name: values.name,
         email: values.email,
         password: values.password,
       });
-      toast.success("Compte créé — bienvenue chez Sou'Sou !");
-      router.push("/");
+      toast.success("Compte créé — on t'a envoyé un code par email.");
+      // Le compte n'est pas encore utilisable : direction la saisie du code.
+      router.push(`/verify-email?email=${encodeURIComponent(email)}`);
     } catch (err) {
       toast.error(extractApiErrorMessage(err, "Inscription impossible"));
     } finally {
