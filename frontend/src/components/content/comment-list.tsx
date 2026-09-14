@@ -45,6 +45,30 @@ export function CommentList({
     onCountChangeRef.current = onCountChange;
   });
 
+  /**
+   * Prévenir le parent du nouveau total est un EFFET DE BORD : il doit se
+   * produire APRÈS le rendu, jamais pendant.
+   *
+   * ⚠️ Boucle infinie corrigée ici. `handleCreated` / `handleDeleted`
+   * appelaient `onCountChange` À L'INTÉRIEUR de l'updater passé à `setTotal`.
+   * React exécute les updaters pendant la phase de rendu et les REJOUE à
+   * chaque tentative : on déclenchait donc un setState du parent en plein
+   * rendu, React invalidait le rendu en cours, rejouait l'updater, qui
+   * reprévenait le parent… jusqu'au garde-fou « Maximum update depth
+   * exceeded » (50 updates imbriqués).
+   *
+   * Un updater doit rester du pur calcul. La notification vit désormais dans
+   * cet effet unique, qui couvre tous les cas (fetch initial, pagination,
+   * création, suppression). `notifiedRef` évite de renotifier une valeur déjà
+   * transmise — montage, StrictMode, ou re-render du parent.
+   */
+  const notifiedRef = useRef<number | null>(initialCount);
+  useEffect(() => {
+    if (notifiedRef.current === total) return;
+    notifiedRef.current = total;
+    onCountChangeRef.current?.(total);
+  }, [total]);
+
   // Fetch initial — re-déclenché uniquement si l'article change.
   useEffect(() => {
     let cancelled = false;
@@ -56,7 +80,6 @@ export function CommentList({
         setPage(res.page);
         setPageCount(res.pageCount);
         setTotal(res.total);
-        onCountChangeRef.current?.(res.total);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -81,7 +104,6 @@ export function CommentList({
       setPage(res.page);
       setPageCount(res.pageCount);
       setTotal(res.total);
-      onCountChangeRef.current?.(res.total);
     } catch (err) {
       toast.error(extractApiErrorMessage(err, "Chargement impossible"));
     } finally {
@@ -92,11 +114,7 @@ export function CommentList({
   function handleCreated(comment: ArticleComment) {
     // On ajoute en fin de liste pour respecter l'ordre asc (chronologique).
     setComments((prev) => [...prev, comment]);
-    setTotal((t) => {
-      const next = t + 1;
-      onCountChangeRef.current?.(next);
-      return next;
-    });
+    setTotal((t) => t + 1);
   }
 
   function handleUpdated(updated: ArticleComment) {
@@ -107,11 +125,7 @@ export function CommentList({
 
   function handleDeleted(id: string) {
     setComments((prev) => prev.filter((c) => c.id !== id));
-    setTotal((t) => {
-      const next = Math.max(0, t - 1);
-      onCountChangeRef.current?.(next);
-      return next;
-    });
+    setTotal((t) => Math.max(0, t - 1));
   }
 
   const hasMore = page < pageCount;

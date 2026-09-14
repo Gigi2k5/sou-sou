@@ -221,7 +221,13 @@ export default function ArticleDetailPage() {
         initialCount={article.commentCount}
         currentUser={user}
         onCountChange={(count) =>
-          setArticle((prev) => (prev ? { ...prev, commentCount: count } : prev))
+          setArticle((prev) => {
+            // Renvoyer la MÊME référence quand rien n'a changé : React
+            // court-circuite alors le re-render. Seconde ligne de défense
+            // contre la boucle de mise à jour côté commentaires.
+            if (!prev || prev.commentCount === count) return prev;
+            return { ...prev, commentCount: count };
+          })
         }
       />
 
