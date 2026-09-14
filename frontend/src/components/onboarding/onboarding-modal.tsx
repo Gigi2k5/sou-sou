@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { X } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { ConfettiBurst } from "@/components/savings/confetti-burst";
@@ -37,28 +37,57 @@ export function OnboardingModal() {
   const [confettiKey, setConfettiKey] = useState(0);
   const [dismissed, setDismissed] = useState(false);
 
-  // Persiste fire-and-forget la step en DB. Pas bloquant.
-  const persistStep = useCallback((s: number) => {
-    void updateOnboarding({ step: s }).catch(() => {
-      // Silent fail — l'user terminera quand même son flow.
+  /**
+   * Persistance de l'étape — dans un EFFET, jamais dans un updater.
+   *
+   * ⚠️ `persistStep()` était appelé À L'INTÉRIEUR de la fonction passée à
+   * `setStep`. Un updater doit être du pur calcul : React l'exécute pendant la
+   * phase de rendu et le REJOUE (deux fois en StrictMode). Conséquences : deux
+   * requêtes PATCH par clic, et surtout, si l'appel lève, la mise à jour
+   * d'état est perdue — le clic semble alors « ne rien faire ».
+   *
+   * `persistedRef` empêche le PATCH au montage (on ne réécrit pas une valeur
+   * qui vient du serveur) et les doublons.
+   */
+  const persistedRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (persistedRef.current === null) {
+      persistedRef.current = step; // montage : rien à persister
+      return;
+    }
+    if (persistedRef.current === step) return;
+    persistedRef.current = step;
+    void updateOnboarding({ step }).catch(() => {
+      // Échec silencieux et non bloquant : l'utilisateur avance quand même.
     });
-  }, []);
+  }, [step]);
 
   const next = useCallback(() => {
-    setStep((s) => {
-      const n = Math.min(s + 1, TOTAL_STEPS - 1);
-      if (n !== s) persistStep(n);
-      return n;
-    });
-  }, [persistStep]);
+    setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
+  }, []);
 
   const previous = useCallback(() => {
-    setStep((s) => {
-      const n = Math.max(s - 1, 0);
-      if (n !== s) persistStep(n);
-      return n;
-    });
-  }, [persistStep]);
+    setStep((s) => Math.max(s - 1, 0));
+  }, []);
+
+  /**
+   * « Ignorer » — doit être DURABLE. L'ancienne croix ne faisait que
+   * `setDismissed(true)` : un état local, perdu au rechargement. La modale
+   * revenait donc indéfiniment, sans aucun moyen d'y échapper.
+   *
+   * Le backend n'expose pas d'état « refusé » distinct : `completed: true` est
+   * la seule façon de marquer l'onboarding comme réglé. On ferme localement
+   * même si l'appel échoue — on ne piège jamais l'utilisateur dans la modale.
+   */
+  const handleSkip = useCallback(async () => {
+    setDismissed(true);
+    try {
+      await updateOnboarding({ completed: true, step });
+      await refresh();
+    } catch {
+      // Ignoré volontairement : la modale est déjà fermée côté client.
+    }
+  }, [step, refresh]);
 
   async function handleComplete() {
     setCompleting(true);
@@ -68,6 +97,11 @@ export function OnboardingModal() {
         step: TOTAL_STEPS - 1,
       });
       setConfettiKey((k) => k + 1);
+      // Fermeture locale immédiate : ne pas dépendre du seul `refresh()`.
+      // Si `/auth/me` échouait ou tardait, le bouton restait bloqué sur « … »
+      // et la modale ne se fermait jamais.
+      setDismissed(true);
+      setCompleting(false);
       await refresh();
       const badgeName = res.newBadges[0]?.name;
       if (res.pointsEarned > 0) {
@@ -85,6 +119,15 @@ export function OnboardingModal() {
       setCompleting(false);
     }
   }
+
+  // Échap : seconde sortie, attendue de toute modale.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") void handleSkip();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleSkip]);
 
   if (!user || user.hasCompletedOnboarding || dismissed) return null;
 
@@ -134,13 +177,17 @@ export function OnboardingModal() {
               current={step}
               className="flex-1 justify-center"
             />
+            {/* Sortie explicite. L'ancienne croix de 28 px (sous la cible
+                tactile de 44) ne portait aucun libellé et ne persistait rien :
+                personne ne la percevait comme un « ignorer », et elle ne
+                fonctionnait pas. */}
             <button
               type="button"
-              onClick={() => setDismissed(true)}
-              className="shrink-0 p-1.5 rounded-full text-sousou-neutral hover:bg-muted hover:text-sousou-secondary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
-              aria-label="Plus tard"
-              title="Continuer plus tard"
+              onClick={() => void handleSkip()}
+              className="shrink-0 inline-flex h-11 items-center gap-1.5 rounded-full px-3 text-sm font-medium text-sousou-neutral hover:bg-muted hover:text-sousou-secondary transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/30"
+              title="Passer l'introduction — elle ne réapparaîtra plus"
             >
+              Ignorer
               <X className="size-4" />
             </button>
           </header>

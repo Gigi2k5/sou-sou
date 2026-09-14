@@ -43,15 +43,26 @@ export function StepShell({
   splitContent,
 }: StepShellProps) {
   return (
-    <div className="flex flex-col h-full">
-      <div
-        className={cn(
-          "flex-1 flex items-center justify-center px-6 py-4 sm:py-8 overflow-y-auto",
-          layout === "split"
-            ? "flex-col-reverse sm:flex-row gap-6 sm:gap-10"
-            : "flex-col gap-6",
-        )}
-      >
+    // `min-h-0` est indispensable : sans lui, un enfant `flex-1` refuse de
+    // rétrécir sous la taille de son contenu et pousse le footer hors de la
+    // boîte, où les `overflow-hidden` parents le découpent. C'était la cause
+    // de l'écran bloqué sur « Étape 1 sur 5 » sans aucun bouton atteignable.
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Conteneur de défilement SIMPLE. Le centrage est porté par l'enfant
+          ci-dessous, pas par ce scroller : `justify-center` + `overflow-y-auto`
+          sur le même élément rend le haut du contenu débordant INATTEIGNABLE
+          (piège flexbox classique). */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <div
+          className={cn(
+            // `min-h-full` : centré quand le contenu tient, hauteur naturelle
+            // et entièrement scrollable quand il déborde.
+            "flex min-h-full items-center justify-center px-6 py-4 sm:py-8",
+            layout === "split"
+              ? "flex-col-reverse sm:flex-row gap-6 sm:gap-10"
+              : "flex-col gap-6",
+          )}
+        >
         {/* Mascotte centrée (centered) ou à droite (split) */}
         <motion.div
           initial={{ scale: 0.85, opacity: 0 }}
@@ -104,12 +115,13 @@ export function StepShell({
           {layout === "split" && splitContent && (
             <div className="hidden sm:block mt-4">{splitContent}</div>
           )}
+          </div>
         </div>
       </div>
 
-      {/* Footer fixe : nav. Pas de motion ici — le footer reste cliquable
-          immédiatement même pendant l'animation d'entrée des éléments du body. */}
-      <div className="border-t border-border/60 px-6 py-4 flex items-center justify-between gap-3 shrink-0">
+      {/* Footer : frère du scroller et `shrink-0` → il ne peut plus être rogné,
+          quelle que soit la hauteur du contenu ou de l'écran. */}
+      <div className="shrink-0 border-t border-border/60 px-6 py-4 flex items-center justify-between gap-3">
         {onPrevious ? (
           <Button
             type="button"
