@@ -67,6 +67,19 @@ npx prisma migrate deploy  # applique les migrations
 npm run start:dev          # http://localhost:4100
 ```
 
+> ⚠️ **Si une variable `DATABASE_URL` traîne dans ton environnement** (exportée
+> par un autre projet, héritée de ton IDE…), elle **écrase** le `backend/.env` :
+> Prisma et NestJS donnent priorité au shell. Symptôme typique :
+> `The table public.Badge does not exist in the current database` — le backend
+> parle en fait à la base d'un autre projet.
+>
+> Les scripts `start`, `start:dev` et `start:debug` la neutralisent désormais
+> (`env -u DATABASE_URL`), donc le `.env` fait foi en dev. `start:prod` n'y
+> touche pas : en production, c'est bien l'environnement qui fournit l'URL.
+>
+> Pour les commandes Prisma, qui ne passent pas par ces scripts, préfixe :
+> `env -u DATABASE_URL npx prisma migrate deploy`
+
 Swagger : `http://localhost:4100/api/docs`
 
 ### 4. Frontend
