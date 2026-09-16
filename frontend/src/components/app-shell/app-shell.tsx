@@ -10,6 +10,7 @@ import {
   PiggyBank,
   Receipt,
   Settings,
+  Upload,
   Shield,
   Sparkles,
   Target,
@@ -52,6 +53,9 @@ const NAV: NavItem[] = [
   { href: "/blog", label: "Blog", icon: BookOpen },
   { href: "/ressources", label: "Vidéos", icon: GraduationCap, desktopOnly: true },
   { href: "/badges", label: "Badges", icon: Award, desktopOnly: true },
+  // Sur mobile, l'import vit dans /plus. Sur desktop il n'y a pas de /plus :
+  // sans cette entrée, la page serait tout simplement inatteignable.
+  { href: "/import", label: "Importer", icon: Upload, desktopOnly: true },
   { href: "/plus", label: "Plus", icon: LayoutGrid, mobileOnly: true },
   { href: "/parametres", label: "Paramètres", icon: Settings },
 ];

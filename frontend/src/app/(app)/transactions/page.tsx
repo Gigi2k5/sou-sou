@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Upload } from "lucide-react";
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -122,13 +123,29 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3">
-        <div>
-          <h1 className="font-serif text-2xl sm:text-3xl text-sousou-secondary">
-            Transactions
-          </h1>
-          <p className="text-sm text-sousou-neutral">
-            Toutes tes entrées et sorties d&apos;argent.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-serif text-2xl sm:text-3xl text-sousou-secondary">
+              Transactions
+            </h1>
+            <p className="text-sm text-sousou-neutral">
+              Toutes tes entrées et sorties d&apos;argent.
+            </p>
+          </div>
+
+          {/* Point d'entrée contextuel : c'est en regardant cette page vide
+              qu'on se dit « et mes anciens comptes ? ». Le menu seul ne suffit
+              pas — encore faut-il penser à y aller. */}
+          <Button
+            variant="outline"
+            size="sm"
+            render={
+              <Link href="/import">
+                <Upload className="size-4" />
+                Importer mon historique
+              </Link>
+            }
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-between">
