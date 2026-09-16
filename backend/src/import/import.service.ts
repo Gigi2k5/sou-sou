@@ -1,0 +1,450 @@
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { TxType } from '@prisma/client';
+
+import { PrismaService } from '../prisma/prisma.service';
+import type { AnalyzeImportDto } from './dto/analyze-import.dto';
+import {
+  type CommitImportDto,
+  MAX_IMPORT_LINES,
+  MAX_LINE_AMOUNT,
+} from './dto/commit-import.dto';
+import { GeminiService } from './gemini.service';
+import type {
+  AnalysisReport,
+  Checkpoint,
+  Direction,
+  ExtractedLine,
+} from './import.types';
+
+/** Tolérance sur les contrôles de totaux. Les montants sont entiers en FCFA. */
+const CHECK_TOLERANCE = 0.5;
+
+/** Bornes de plausibilité des dates importées. */
+const MIN_YEAR = 2000;
+
+@Injectable()
+export class ImportService {
+  private readonly logger = new Logger(ImportService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly gemini: GeminiService,
+  ) {}
+
+  // ---------------------------------------------------------------------------
+  // ANALYSE — aucune écriture. L'utilisateur doit pouvoir relire avant de subir.
+  // ---------------------------------------------------------------------------
+
+  async analyze(
+    userId: string,
+    dto: AnalyzeImportDto,
+  ): Promise<AnalysisReport> {
+    const [user, categories, sources] = await Promise.all([
+      this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { currency: true },
+      }),
+      this.prisma.expenseCategory.findMany({
+        where: { userId },
+        select: { name: true },
+      }),
+      this.prisma.incomeSource.findMany({
+        where: { userId },
+        select: { name: true },
+      }),
+    ]);
+
+    const knownCategories = categories.map((c) => c.name);
+    const knownSources = sources.map((s) => s.name);
+
+    const raw = await this.gemini.extract(dto.text, {
+      expenseCategories: knownCategories,
+      incomeSources: knownSources,
+      currency: user.currency,
+      dateFormat: dto.dateFormat,
+    });
+
+    const warnings: string[] = [];
+    const lines = this.sanitizeLines(raw.lines, warnings);
+
+    if (lines.length === 0) {
+      warnings.push(
+        "Aucune transaction exploitable n'a été trouvée dans ce texte.",
+      );
+    }
+    if (lines.length > MAX_IMPORT_LINES) {
+      warnings.push(
+        `${lines.length} lignes détectées, au-delà de la limite de ${MAX_IMPORT_LINES}. Découpe ton texte par mois.`,
+      );
+    }
+
+    const income = sum(lines.filter((l) => l.direction === 'income'));
+    const expense = sum(lines.filter((l) => l.direction === 'expense'));
+
+    // Le cas « dépenses seules » n'est pas une anomalie : beaucoup de carnets
+    // ne notent que les sorties. Mais importer ça tel quel afficherait un solde
+    // catastrophiquement négatif, donc on le signale explicitement.
+    if (lines.length > 0 && income === 0) {
+      warnings.push('ONLY_EXPENSES');
+    }
+
+    const checkpoints = this.buildCheckpoints(raw, lines);
+    const passed = checkpoints.filter((c) => c.ok).length;
+    if (checkpoints.length > 0 && passed < checkpoints.length) {
+      warnings.push(
+        `${checkpoints.length - passed} total(aux) du document ne correspondent pas à ce qui a été extrait.`,
+      );
+    }
+
+    return {
+      periodLabel: raw.periodLabel?.trim() || null,
+      lines,
+      totals: {
+        income,
+        expense,
+        declaredIncome: finiteOrNull(raw.declaredPeriodTotals?.income),
+        declaredExpense: finiteOrNull(raw.declaredPeriodTotals?.expense),
+      },
+      checkpoints,
+      checkSummary: { passed, total: checkpoints.length },
+      categories: split(
+        lines.filter((l) => l.direction === 'expense'),
+        knownCategories,
+      ),
+      incomeSources: split(
+        lines.filter((l) => l.direction === 'income'),
+        knownSources,
+      ),
+      warnings,
+    };
+  }
+
+  /**
+   * Filtre ce que le modèle a renvoyé.
+   *
+   * Tout ce qui sort du LLM est traité comme une saisie hostile : une date
+   * illisible, un montant négatif ou un libellé vide sont écartés plutôt que
+   * corrigés en silence, et l'utilisateur est prévenu du nombre de rejets.
+   */
+  private sanitizeLines(
+    raw: ExtractedLine[],
+    warnings: string[],
+  ): ExtractedLine[] {
+    const maxDate = new Date();
+    maxDate.setFullYear(maxDate.getFullYear() + 1);
+
+    let rejected = 0;
+    const clean: ExtractedLine[] = [];
+
+    for (const line of raw) {
+      const date = parseIsoDate(line?.date);
+      const amount = Number(line?.amount);
+      const label = typeof line?.label === 'string' ? line.label.trim() : '';
+
+      const valid =
+        date !== null &&
+        date.getFullYear() >= MIN_YEAR &&
+        date <= maxDate &&
+        Number.isFinite(amount) &&
+        amount > 0 &&
+        amount <= MAX_LINE_AMOUNT &&
+        label.length > 0 &&
+        (line.direction === 'income' || line.direction === 'expense');
+
+      if (!valid) {
+        rejected += 1;
+        continue;
+      }
+
+      clean.push({
+        date: date.toISOString().slice(0, 10),
+        label: label.slice(0, 280),
+        amount: Math.round(amount * 100) / 100,
+        direction: line.direction,
+        category:
+          typeof line.category === 'string' && line.category.trim()
+            ? line.category.trim().slice(0, 60)
+            : undefined,
+        confidence: clampConfidence(line.confidence),
+      });
+    }
+
+    if (rejected > 0) {
+      warnings.push(
+        `${rejected} ligne(s) illisible(s) ont été écartées (date, montant ou libellé invalide).`,
+      );
+    }
+    return clean;
+  }
+
+  /**
+   * Confronte les totaux ANNONCÉS par le document à ceux calculés.
+   *
+   * C'est le seul contrôle objectif dont on dispose : un total journalier qui
+   * tombe juste prouve qu'aucune ligne du jour n'a été oubliée, inventée, ni
+   * rangée du mauvais côté. Un carnet qui porte ses totaux se vérifie tout seul.
+   */
+  private buildCheckpoints(
+    raw: {
+      declaredPeriodTotals?: { income?: number; expense?: number };
+      declaredDailyTotals?: {
+        date: string;
+        income?: number;
+        expense?: number;
+      }[];
+    },
+    lines: ExtractedLine[],
+  ): Checkpoint[] {
+    const checks: Checkpoint[] = [];
+
+    const push = (
+      scope: 'period' | 'day',
+      label: string,
+      direction: Direction,
+      declared: number | null,
+      computed: number,
+    ) => {
+      if (declared === null) return;
+      checks.push({
+        scope,
+        label,
+        direction,
+        declared,
+        computed,
+        ok: Math.abs(declared - computed) <= CHECK_TOLERANCE,
+      });
+    };
+
+    for (const daily of raw.declaredDailyTotals ?? []) {
+      const date = parseIsoDate(daily?.date);
+      if (!date) continue;
+      const key = date.toISOString().slice(0, 10);
+      const ofDay = lines.filter((l) => l.date === key);
+      push(
+        'day',
+        key,
+        'expense',
+        finiteOrNull(daily.expense),
+        sum(ofDay.filter((l) => l.direction === 'expense')),
+      );
+      push(
+        'day',
+        key,
+        'income',
+        finiteOrNull(daily.income),
+        sum(ofDay.filter((l) => l.direction === 'income')),
+      );
+    }
+
+    push(
+      'period',
+      'Total période',
+      'expense',
+      finiteOrNull(raw.declaredPeriodTotals?.expense),
+      sum(lines.filter((l) => l.direction === 'expense')),
+    );
+    push(
+      'period',
+      'Total période',
+      'income',
+      finiteOrNull(raw.declaredPeriodTotals?.income),
+      sum(lines.filter((l) => l.direction === 'income')),
+    );
+
+    return checks;
+  }
+
+  // ---------------------------------------------------------------------------
+  // ÉCRITURE — on n'écrit que ce que l'utilisateur a relu et validé.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Écrit les lignes validées dans un lot annulable.
+   *
+   * Les crochets de gamification ne sont volontairement PAS déclenchés : on
+   * écrit via Prisma et non via TransactionsService. Importer trois mois
+   * d'historique ne doit pas offrir une série de 90 jours ni une avalanche de
+   * points — la récompense doit rester liée à l'usage réel.
+   */
+  async commit(userId: string, dto: CommitImportDto) {
+    const lines = dto.lines;
+
+    const expenseNames = distinct(
+      lines.filter((l) => l.direction === 'expense').map((l) => l.category),
+    );
+    const incomeNames = distinct(
+      lines.filter((l) => l.direction === 'income').map((l) => l.category),
+    );
+
+    const importedExpenseTotal = sum(
+      lines.filter((l) => l.direction === 'expense'),
+    );
+    const importedIncomeTotal = sum(
+      lines.filter((l) => l.direction === 'income'),
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      const categoryIds = new Map<string, string>();
+      for (const name of expenseNames) {
+        const cat = await tx.expenseCategory.upsert({
+          where: { userId_name: { userId, name } },
+          update: {},
+          create: { userId, name, kind: 'FREE' },
+          select: { id: true },
+        });
+        categoryIds.set(name, cat.id);
+      }
+
+      const sourceIds = new Map<string, string>();
+      for (const name of incomeNames) {
+        const src = await tx.incomeSource.upsert({
+          where: { userId_name: { userId, name } },
+          update: {},
+          create: { userId, name },
+          select: { id: true },
+        });
+        sourceIds.set(name, src.id);
+      }
+
+      const batch = await tx.importBatch.create({
+        data: {
+          userId,
+          source: 'TEXT',
+          periodLabel: dto.periodLabel ?? null,
+          lineCount: lines.length,
+          importedIncomeTotal,
+          importedExpenseTotal,
+          declaredIncomeTotal: dto.declaredIncomeTotal ?? null,
+          declaredExpenseTotal: dto.declaredExpenseTotal ?? null,
+        },
+      });
+
+      await tx.transaction.createMany({
+        data: lines.map((l) => ({
+          userId,
+          type: l.direction === 'income' ? TxType.INCOME : TxType.EXPENSE,
+          amount: l.amount,
+          // Midi UTC : une date d'historique n'a pas d'heure, et se caler à
+          // midi évite qu'un décalage de fuseau la fasse basculer la veille.
+          date: new Date(`${l.date}T12:00:00.000Z`),
+          note: l.label,
+          expenseCategoryId:
+            l.direction === 'expense' && l.category
+              ? (categoryIds.get(l.category) ?? null)
+              : null,
+          incomeSourceId:
+            l.direction === 'income' && l.category
+              ? (sourceIds.get(l.category) ?? null)
+              : null,
+          importBatchId: batch.id,
+        })),
+      });
+
+      this.logger.log(
+        `Import ${batch.id} — ${lines.length} transactions pour l'utilisateur ${userId}`,
+      );
+
+      return {
+        batchId: batch.id,
+        lineCount: lines.length,
+        importedIncomeTotal,
+        importedExpenseTotal,
+        createdCategories: expenseNames.length,
+        createdIncomeSources: incomeNames.length,
+      };
+    });
+  }
+
+  /** Historique des imports — alimente le bouton « annuler ». */
+  async listBatches(userId: string) {
+    return this.prisma.importBatch.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+    });
+  }
+
+  /**
+   * Annule un import en bloc.
+   *
+   * Les transactions sont supprimées AVANT le lot : la relation est en
+   * `SetNull`, donc supprimer le lot d'abord les détacherait au lieu de les
+   * effacer — elles resteraient orphelines et invisibles.
+   */
+  async undo(userId: string, batchId: string) {
+    const batch = await this.prisma.importBatch.findFirst({
+      where: { id: batchId, userId },
+      select: { id: true },
+    });
+    if (!batch) {
+      throw new NotFoundException('Import introuvable.');
+    }
+
+    const [deleted] = await this.prisma.$transaction([
+      this.prisma.transaction.deleteMany({
+        where: { importBatchId: batchId, userId },
+      }),
+      this.prisma.importBatch.delete({ where: { id: batchId } }),
+    ]);
+
+    this.logger.log(
+      `Import ${batchId} annulé — ${deleted.count} transactions supprimées`,
+    );
+    return { deletedCount: deleted.count };
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Utilitaires
+// -----------------------------------------------------------------------------
+
+function sum(lines: { amount: number }[]): number {
+  return Math.round(lines.reduce((acc, l) => acc + l.amount, 0) * 100) / 100;
+}
+
+function distinct(values: (string | undefined)[]): string[] {
+  return [
+    ...new Set(
+      values
+        .map((v) => v?.trim())
+        .filter((v): v is string => typeof v === 'string' && v.length > 0),
+    ),
+  ];
+}
+
+function split(
+  lines: ExtractedLine[],
+  known: string[],
+): { known: string[]; toCreate: string[] } {
+  const used = distinct(lines.map((l) => l.category));
+  const knownSet = new Set(known);
+  return {
+    known: used.filter((n) => knownSet.has(n)),
+    toCreate: used.filter((n) => !knownSet.has(n)),
+  };
+}
+
+function parseIsoDate(value: unknown): Date | null {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value.trim());
+  if (!match) return null;
+  const [, y, m, d] = match;
+  const date = new Date(`${y}-${m}-${d}T12:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  // Rejette les dates qui « débordent » (31/02 deviendrait le 03/03).
+  if (date.getUTCDate() !== Number(d) || date.getUTCMonth() + 1 !== Number(m)) {
+    return null;
+  }
+  return date;
+}
+
+function finiteOrNull(value: unknown): number | null {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function clampConfidence(value: unknown): number | undefined {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.min(1, Math.max(0, n));
+}
