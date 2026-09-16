@@ -8,7 +8,12 @@ import { DoneStep } from "@/components/import/done-step";
 import { PasteStep } from "@/components/import/paste-step";
 import { ReviewStep } from "@/components/import/review-step";
 import { extractApiErrorMessage } from "@/lib/api";
-import { analyzeImport, commitImport, undoImport } from "@/lib/import-api";
+import {
+  analyzeImport,
+  commitImport,
+  describeAnalyzeError,
+  undoImport,
+} from "@/lib/import-api";
 import { declaredPeriod } from "@/lib/import-checks";
 import { useAuth } from "@/providers/auth-provider";
 import type {
@@ -53,7 +58,7 @@ export default function ImportPage() {
       const phrases = res.warnings.filter((w) => w !== "ONLY_EXPENSES");
       for (const w of phrases) toast.warning(w, { duration: 7000 });
     } catch (err) {
-      toast.error(extractApiErrorMessage(err, "Analyse impossible"));
+      toast.error(describeAnalyzeError(err), { duration: 8000 });
     } finally {
       setAnalyzing(false);
     }
