@@ -137,6 +137,18 @@ export class GeminiService {
         temperature: 0,
         responseMimeType: 'application/json',
         responseSchema: RESPONSE_SCHEMA,
+        // Raisonnement DÉSACTIVÉ. Gemini 2.5 Flash « réfléchit » par défaut, et
+        // sur cette tâche c'est du gaspillage pur : mesuré sur un carnet réel,
+        // 56 s et 11 364 tokens de réflexion contre 13 s et 0 token sans — pour
+        // une qualité strictement identique (98 lignes, 16 contrôles
+        // journaliers sur 17 dans les deux cas).
+        //
+        // C'était la cause des timeouts : la latence avec réflexion est
+        // variable et dépassait le garde-fou.
+        //
+        // Lire un tableau de dates et de montants ne demande pas de
+        // délibération — le schéma de sortie fait déjà tout le cadrage.
+        thinkingConfig: { thinkingBudget: 0 },
       },
     };
 
