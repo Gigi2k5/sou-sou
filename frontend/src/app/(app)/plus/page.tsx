@@ -7,11 +7,19 @@ import {
   GraduationCap,
   Settings,
   Sparkles,
+  Upload,
   Wallet,
 } from "lucide-react";
 import Link from "next/link";
 
 const ITEMS = [
+  {
+    href: "/import",
+    label: "Importer mon historique",
+    icon: Upload,
+    desc: "Récupérer tes anciennes notes au lieu de tout ressaisir",
+    tint: "bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-200",
+  },
   {
     href: "/budgets",
     label: "Budgets",
