@@ -22,13 +22,16 @@ export default function InsightsPage() {
   const currency = user?.currency ?? "FCFA";
 
   const [period, setPeriod] = useState<InsightsPeriod>("current_month");
+  // 0 = période courante. Permet de consulter un historique ancien — impossible
+  // auparavant, les quatre périodes étant toutes ancrées sur le présent.
+  const [monthOffset, setMonthOffset] = useState(0);
   const [data, setData] = useState<InsightsResponse | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(async (p: InsightsPeriod) => {
+  const refresh = useCallback(async (p: InsightsPeriod, offset: number) => {
     setLoading(true);
     try {
-      const res = await getInsights(p);
+      const res = await getInsights(p, offset);
       setData(res);
     } catch (err) {
       toast.error(extractApiErrorMessage(err, "Chargement impossible"));
@@ -38,8 +41,8 @@ export default function InsightsPage() {
   }, []);
 
   useEffect(() => {
-    void refresh(period);
-  }, [period, refresh]);
+    void refresh(period, monthOffset);
+  }, [period, monthOffset, refresh]);
 
   return (
     <div className="space-y-6">
@@ -59,6 +62,8 @@ export default function InsightsPage() {
           value={period}
           onChange={setPeriod}
           disabled={loading}
+          monthOffset={monthOffset}
+          onMonthOffsetChange={setMonthOffset}
         />
       </header>
 

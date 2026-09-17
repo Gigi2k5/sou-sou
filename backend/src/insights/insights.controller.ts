@@ -33,6 +33,7 @@ export class InsightsController {
       user.id,
       query.period,
       u?.currency ?? 'FCFA',
+      query.monthOffset,
     );
   }
 }

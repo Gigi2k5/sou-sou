@@ -22,6 +22,7 @@ import { StatCard } from "@/components/tracker/stat-card";
 import { TransactionDialog } from "@/components/tracker/transaction-dialog";
 import { TransactionItem } from "@/components/tracker/transaction-item";
 import { Button } from "@/components/ui/button";
+import { HistoryElsewhereHint } from "@/components/tracker/history-elsewhere-hint";
 import { Skeleton } from "@/components/ui/skeleton";
 import { listBudgets } from "@/lib/budgets-api";
 import {
@@ -44,10 +45,18 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const mascot = useMascotMessage("dashboard");
   const [rangeKey, setRangeKey] = useState<RangeKey>("month");
-  const range = useMemo(() => buildRange(rangeKey), [rangeKey]);
+  // 0 = mois courant. Permet de remonter dans l'historique, ce qui était
+  // impossible avant : les plages s'ancraient toutes sur aujourd'hui.
+  const [monthOffset, setMonthOffset] = useState(0);
+  const range = useMemo(
+    () => buildRange(rangeKey, monthOffset),
+    [rangeKey, monthOffset],
+  );
 
   const [summary, setSummary] = useState<TransactionsSummary | null>(null);
   const [recent, setRecent] = useState<Transaction[]>([]);
+  /** Nombre de transactions TOUTES périodes — la requête `recent` n'est pas bornée. */
+  const [allTimeCount, setAllTimeCount] = useState(0);
   const [sources, setSources] = useState<IncomeSource[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
@@ -66,6 +75,7 @@ export default function DashboardPage() {
       ]);
       setSummary(s);
       setRecent(list.items);
+      setAllTimeCount(list.total);
       setSources(src);
       setCategories(cats);
       setBudgets(bs);
@@ -79,6 +89,20 @@ export default function DashboardPage() {
   }, [refreshAll]);
 
   const currency = user?.currency ?? "FCFA";
+
+  /**
+   * La période affichée est vide alors que le compte contient des données
+   * ailleurs. `recent` n'est volontairement pas filtré par la plage courante :
+   * sa première entrée est donc la transaction la plus récente, toutes périodes
+   * confondues, et elle suffit à situer l'historique.
+   */
+  const showElsewhereHint =
+    !loading &&
+    summary !== null &&
+    summary.income.total === 0 &&
+    summary.expense.total === 0 &&
+    allTimeCount > 0 &&
+    recent.length > 0;
 
   return (
     <div className="space-y-6">
@@ -103,8 +127,24 @@ export default function DashboardPage() {
             {user?.name}
           </h1>
         </div>
-        <RangeTabs value={rangeKey} onChange={setRangeKey} />
+        <RangeTabs
+            value={rangeKey}
+            onChange={setRangeKey}
+            monthOffset={monthOffset}
+            onMonthOffsetChange={setMonthOffset}
+          />
       </div>
+
+      {showElsewhereHint && recent[0] && (
+        <HistoryElsewhereHint
+          latestDate={recent[0].date}
+          totalCount={allTimeCount}
+          onShowAll={() => {
+            setMonthOffset(0);
+            setRangeKey("all");
+          }}
+        />
+      )}
 
       {/* Hero balance */}
       {loading || !summary ? (

@@ -18,6 +18,7 @@ import { MoneyPotsModule } from './money-pots/money-pots.module';
 import { EmailModule } from './email/email.module';
 import { ExpenseCategoriesModule } from './expense-categories/expense-categories.module';
 import { GamificationModule } from './gamification/gamification.module';
+import { ImportModule } from './import/import.module';
 import { IncomeSourcesModule } from './income-sources/income-sources.module';
 import { InsightsModule } from './insights/insights.module';
 import { NotificationsModule } from './notifications/notifications.module';
@@ -64,6 +65,7 @@ import { UsersModule } from './users/users.module';
     MascotModule,
     BudgetsModule,
     InsightsModule,
+    ImportModule,
   ],
   controllers: [AppController],
   providers: [

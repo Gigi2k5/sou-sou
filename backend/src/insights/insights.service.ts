@@ -87,8 +87,25 @@ export class InsightsService {
     userId: string,
     period: InsightsPeriod,
     currency: string,
+    monthOffset = 0,
   ): Promise<InsightsResponse> {
-    const now = new Date();
+    // Décaler la date de référence suffit : toutes les périodes en découlent,
+    // y compris la période précédente servant aux comparaisons. On se cale au
+    // 15 pour qu'un décalage ne fasse jamais déborder sur un mois voisin (le 31
+    // mars moins un mois n'existe pas).
+    const base = new Date();
+    const now =
+      monthOffset === 0
+        ? base
+        : new Date(
+            base.getFullYear(),
+            base.getMonth() + monthOffset,
+            15,
+            12,
+            0,
+            0,
+            0,
+          );
     const range = computePeriod(period, now);
     const prevRange = computePreviousPeriod(range, period);
 

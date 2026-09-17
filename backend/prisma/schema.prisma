@@ -102,6 +102,7 @@ model User {
   addedResources        Resource[]             @relation("AddedResources")
   createdBroadcasts     Broadcast[]            @relation("CreatedBroadcasts")
   budgets               Budget[]
+  importBatches         ImportBatch[]
 
   @@index([email])
   @@index([isBanned])
@@ -185,16 +186,16 @@ enum BroadcastSegment {
 }
 
 model Broadcast {
-  id        String           @id @default(uuid())
-  title     String
-  body      String           @db.Text
-  segment   BroadcastSegment
+  id             String           @id @default(uuid())
+  title          String
+  body           String           @db.Text
+  segment        BroadcastSegment
   /// Snapshot du nombre d'utilisateurs ciblés au moment de l'envoi.
-  recipientCount Int          @default(0)
+  recipientCount Int              @default(0)
   /// Admin qui a envoyé. SetNull si l'admin est supprimé après coup.
-  createdById String?
-  createdBy   User?           @relation("CreatedBroadcasts", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt   DateTime        @default(now())
+  createdById    String?
+  createdBy      User?            @relation("CreatedBroadcasts", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime         @default(now())
 
   @@index([segment])
   @@index([createdAt])
@@ -342,12 +343,61 @@ model Transaction {
   recurringTransactionId String?
   recurringTransaction   RecurringTransaction? @relation(fields: [recurringTransactionId], references: [id], onDelete: SetNull)
 
+  /// Set quand la transaction vient d'un import d'historique. Permet d'annuler
+  /// un import en bloc (cf. ImportBatch). `SetNull` et pas `Cascade` : purger
+  /// l'historique des imports ne doit jamais effacer les transactions.
+  importBatchId String?
+  importBatch   ImportBatch? @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([userId, date])
   @@index([userId, type])
   @@index([recurringTransactionId])
+  @@index([importBatchId])
+}
+
+// -----------------------------------------------------------------------------
+// Import d'historique (V5)
+// -----------------------------------------------------------------------------
+
+/// Un lot d'import = une session « je colle mes anciennes notes ».
+///
+/// Deux raisons d'exister :
+///  1. ANNULATION. Les gens importent deux fois — c'est systématique. Sans lot,
+///     il faudrait supprimer les transactions une par une.
+///  2. CONTRÔLE. On mémorise les totaux ANNONCÉS par le fichier (quand il en
+///     contient) à côté des totaux RÉELLEMENT importés. L'écart est la seule
+///     preuve objective que l'extraction est fidèle, et il reste consultable
+///     après coup.
+model ImportBatch {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  source      ImportSource @default(TEXT)
+  /// Libellé lisible de la période couverte, ex. « Août 2026 ».
+  periodLabel String?
+
+  /// Totaux effectivement écrits en base.
+  importedIncomeTotal  Float @default(0)
+  importedExpenseTotal Float @default(0)
+  lineCount            Int   @default(0)
+
+  /// Totaux lus dans le document source (null si absents).
+  declaredIncomeTotal  Float?
+  declaredExpenseTotal Float?
+
+  transactions Transaction[]
+  createdAt    DateTime      @default(now())
+
+  @@index([userId, createdAt])
+}
+
+enum ImportSource {
+  TEXT
+  FILE
 }
 
 // -----------------------------------------------------------------------------
@@ -493,14 +543,14 @@ model ArticleLike {
 }
 
 model ArticleComment {
-  id        String   @id @default(uuid())
+  id        String  @id @default(uuid())
   articleId String
-  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+  article   Article @relation(fields: [articleId], references: [id], onDelete: Cascade)
   authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User    @relation(fields: [authorId], references: [id], onDelete: Cascade)
 
   /// Plain text — auto-link des URLs côté front uniquement (pas de markdown).
-  body      String   @db.Text
+  body String @db.Text
 
   // Modération admin (parallèle à Article)
   isHidden     Boolean   @default(false)
@@ -519,8 +569,8 @@ model ArticleComment {
 }
 
 model Resource {
-  id           String   @id @default(uuid())
-  videoId      String   @unique
+  id           String  @id @default(uuid())
+  videoId      String  @unique
   title        String
   channelName  String
   thumbnailUrl String
@@ -530,15 +580,15 @@ model Resource {
 
   /// Position dans l'ordre admin — petites valeurs en premier.
   /// Float pour pouvoir insérer entre deux items sans renuméroter.
-  position    Float    @default(0)
+  position   Float   @default(0)
   /// Mis en avant : badge + tri prioritaire en tête de liste publique.
-  isFeatured  Boolean  @default(false)
+  isFeatured Boolean @default(false)
   /// Admin qui a ajouté la ressource. SetNull si admin supprimé.
-  addedById   String?
-  addedBy     User?    @relation("AddedResources", fields: [addedById], references: [id], onDelete: SetNull)
+  addedById  String?
+  addedBy    User?   @relation("AddedResources", fields: [addedById], references: [id], onDelete: SetNull)
 
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([category])
   @@index([position])

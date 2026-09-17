@@ -1,14 +1,23 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  CalendarSearch,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  Upload,
+} from "lucide-react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { MascotAnimated } from "@/components/mascot/mascot-animated";
 import { DeleteConfirmDialog } from "@/components/tracker/delete-confirm-dialog";
 import {
   buildRange,
+  monthLabel,
   RangeTabs,
   type RangeKey,
 } from "@/components/tracker/range-tabs";
@@ -37,15 +46,68 @@ import type {
 
 type TypeFilter = "ALL" | TxType;
 
+/**
+ * `useSearchParams` impose une frontière Suspense — même motif que
+ * verify-email et reset-password.
+ */
 export default function TransactionsPage() {
-  const { user } = useAuth();
+  return (
+    <Suspense fallback={<TransactionsSkeleton />}>
+      <TransactionsPageInner />
+    </Suspense>
+  );
+}
 
-  const [rangeKey, setRangeKey] = useState<RangeKey>("month");
-  const range = useMemo(() => buildRange(rangeKey), [rangeKey]);
+function TransactionsSkeleton() {
+  return (
+    <div className="space-y-4 p-4 sm:p-6">
+      <Skeleton className="h-10 w-48 rounded-xl" />
+      <Skeleton className="h-24 rounded-2xl" />
+      <Skeleton className="h-24 rounded-2xl" />
+    </div>
+  );
+}
+
+function TransactionsPageInner() {
+  const { user } = useAuth();
+  const searchParams = useSearchParams();
+
+  /**
+   * `?range=all` permet à un écran tiers d'ouvrir la page sur la bonne fenêtre.
+   * L'import s'en sert : sans ça il renvoie sur le mois courant, où des données
+   * vieilles de quatre mois n'apparaissent évidemment pas — et l'import passe
+   * pour un échec alors qu'il a parfaitement fonctionné.
+   *
+   * Lu à l'initialisation seulement : ensuite c'est l'utilisateur qui pilote.
+   */
+  const [rangeKey, setRangeKey] = useState<RangeKey>(() => {
+    const requested = searchParams.get("range");
+    return requested === "all" ||
+      requested === "week" ||
+      requested === "3months" ||
+      requested === "month"
+      ? requested
+      : "month";
+  });
+  // 0 = mois courant. Permet de remonter dans l'historique, ce qui était
+  // impossible avant : les plages s'ancraient toutes sur aujourd'hui.
+  const [monthOffset, setMonthOffset] = useState(0);
+  const range = useMemo(
+    () => buildRange(rangeKey, monthOffset),
+    [rangeKey, monthOffset],
+  );
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
   const [page, setPage] = useState(1);
 
   const [list, setList] = useState<TransactionsList | null>(null);
+  /**
+   * Repère de l'historique hors plage courante, renseigné uniquement quand la
+   * plage affichée est vide — inutile de payer une requête sinon.
+   */
+  const [elsewhere, setElsewhere] = useState<{
+    count: number;
+    latest: string;
+  } | null>(null);
   const [sources, setSources] = useState<IncomeSource[]>([]);
   const [categories, setCategories] = useState<ExpenseCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,6 +134,20 @@ export default function TransactionsPage() {
           : Promise.resolve(categories),
       ]);
       setList(data);
+
+      // Plage vide : on regarde si le compte contient des données ailleurs,
+      // pour ne pas afficher « commence par enregistrer ta première dépense » à
+      // quelqu'un qui vient d'importer six mois d'historique.
+      if (data.items.length === 0) {
+        const all = await listTransactions({ limit: 1, page: 1 });
+        setElsewhere(
+          all.total > 0 && all.items[0]
+            ? { count: all.total, latest: all.items[0].date }
+            : null,
+        );
+      } else {
+        setElsewhere(null);
+      }
       if (sources.length === 0) setSources(src as IncomeSource[]);
       if (categories.length === 0) setCategories(cats as ExpenseCategory[]);
     } finally {
@@ -122,13 +198,31 @@ export default function TransactionsPage() {
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-3">
-        <div>
-          <h1 className="font-serif text-2xl sm:text-3xl text-sousou-secondary">
-            Transactions
-          </h1>
-          <p className="text-sm text-sousou-neutral">
-            Toutes tes entrées et sorties d&apos;argent.
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h1 className="font-serif text-2xl sm:text-3xl text-sousou-secondary">
+              Transactions
+            </h1>
+            <p className="text-sm text-sousou-neutral">
+              Toutes tes entrées et sorties d&apos;argent.
+            </p>
+          </div>
+
+          {/* Point d'entrée contextuel : c'est en regardant cette page vide
+              qu'on se dit « et mes anciens comptes ? ». Le menu seul ne suffit
+              pas — encore faut-il penser à y aller. */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10"
+            nativeButton={false}
+            render={
+              <Link href="/import">
+                <Upload className="size-4" />
+                Importer mon historique
+              </Link>
+            }
+          />
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:justify-between">
@@ -142,7 +236,12 @@ export default function TransactionsPage() {
               <TabsTab value="EXPENSE">Dépenses</TabsTab>
             </TabsList>
           </Tabs>
-          <RangeTabs value={rangeKey} onChange={setRangeKey} />
+          <RangeTabs
+            value={rangeKey}
+            onChange={setRangeKey}
+            monthOffset={monthOffset}
+            onMonthOffsetChange={setMonthOffset}
+          />
         </div>
       </header>
 
@@ -161,7 +260,15 @@ export default function TransactionsPage() {
             ))}
           </div>
         ) : !list || list.items.length === 0 ? (
-          <EmptyList onCreate={() => setDialogOpen(true)} />
+          <EmptyList
+            onCreate={() => setDialogOpen(true)}
+            elsewhere={elsewhere}
+            onShowAll={() => {
+              setMonthOffset(0);
+              setRangeKey("all");
+              setPage(1);
+            }}
+          />
         ) : (
           <>
             <ul>
@@ -273,7 +380,16 @@ export default function TransactionsPage() {
   );
 }
 
-function EmptyList({ onCreate }: { onCreate: () => void }) {
+function EmptyList({
+  onCreate,
+  elsewhere,
+  onShowAll,
+}: {
+  onCreate: () => void;
+  /** Données existantes hors de la plage affichée, le cas échéant. */
+  elsewhere: { count: number; latest: string } | null;
+  onShowAll: () => void;
+}) {
   return (
     <div className="flex flex-col items-center text-center py-12 px-4">
       <MascotAnimated
@@ -286,13 +402,43 @@ function EmptyList({ onCreate }: { onCreate: () => void }) {
       <h3 className="font-serif text-xl text-sousou-secondary mb-1">
         Aucune transaction sur cette période
       </h3>
-      <p className="text-sm text-sousou-neutral max-w-sm mb-5">
-        Commence par enregistrer ton premier revenu ou ta première dépense.
-      </p>
-      <Button onClick={onCreate}>
-        <Plus className="size-4" />
-        Ajouter une transaction
-      </Button>
+
+      {/* Inviter à « enregistrer sa première dépense » quelqu'un qui en a déjà
+          cent cinquante, mais sur un autre mois, c'est lui faire croire que ses
+          données ont disparu. */}
+      {elsewhere ? (
+        <>
+          <p className="text-sm text-sousou-neutral max-w-sm mb-5">
+            Ton compte contient{" "}
+            <strong className="tabular-nums">{elsewhere.count}</strong>{" "}
+            transaction{elsewhere.count > 1 ? "s" : ""} — la plus récente en{" "}
+            <strong className="capitalize">
+              {monthLabel(new Date(elsewhere.latest))}
+            </strong>
+            .
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button onClick={onShowAll}>
+              <CalendarSearch className="size-4" />
+              Tout afficher
+            </Button>
+            <Button variant="outline" onClick={onCreate}>
+              <Plus className="size-4" />
+              Ajouter une transaction
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm text-sousou-neutral max-w-sm mb-5">
+            Commence par enregistrer ton premier revenu ou ta première dépense.
+          </p>
+          <Button onClick={onCreate}>
+            <Plus className="size-4" />
+            Ajouter une transaction
+          </Button>
+        </>
+      )}
     </div>
   );
 }
