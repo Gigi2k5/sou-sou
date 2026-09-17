@@ -186,7 +186,9 @@ export function DoneStep({
           variant="outline"
           className="flex-1"
           nativeButton={false}
-          render={<Link href="/transactions">Voir mes transactions</Link>}
+          render={
+            <Link href="/transactions?range=all">Voir mes transactions</Link>
+          }
         />
       </div>
 
