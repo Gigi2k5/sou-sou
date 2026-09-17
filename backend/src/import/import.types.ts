@@ -21,14 +21,36 @@ export interface ExtractedLine {
   confidence?: number;
 }
 
-/** Totaux lus DANS le document source, quand il en contient. */
+/**
+ * Totaux lus DANS le document source, quand il en contient.
+ *
+ * `gross` couvre le cas dominant : un carnet écrit « Total = 32000 », un seul
+ * nombre, sans distinguer entrées et sorties. Il DOIT rester distinct de
+ * `income`/`expense`, sans quoi la référence bougerait au gré du classement
+ * des lignes — et une référence qui bouge ne vérifie plus rien.
+ *
+ * `income`/`expense` ne sont renseignés que si le document sépare lui-même les
+ * deux sens (deux colonnes, « Entrées : … · Sorties : … »).
+ */
 export interface DeclaredTotals {
+  gross?: number;
   income?: number;
   expense?: number;
 }
 
 export interface DeclaredDailyTotal {
   date: string;
+  gross?: number;
+  income?: number;
+  expense?: number;
+}
+
+/** Total hebdomadaire annoncé, avec les jours qu'il prétend couvrir. */
+export interface DeclaredWeeklyTotal {
+  label?: string;
+  from: string;
+  to: string;
+  gross?: number;
   income?: number;
   expense?: number;
 }
@@ -39,6 +61,7 @@ export interface ExtractionResult {
   onlyExpenses?: boolean;
   declaredPeriodTotals?: DeclaredTotals;
   declaredDailyTotals?: DeclaredDailyTotal[];
+  declaredWeeklyTotals?: DeclaredWeeklyTotal[];
   lines: ExtractedLine[];
 }
 
@@ -50,13 +73,20 @@ export interface ExtractionResult {
  * il remonte à l'utilisateur, qui tranche. Mieux vaut un avertissement honnête
  * qu'un import silencieusement faux.
  */
+/** `gross` = toutes lignes confondues, quel que soit leur sens. */
+export type Measure = Direction | 'gross';
+
 export interface Checkpoint {
-  scope: 'period' | 'day';
+  scope: 'period' | 'week' | 'day';
+  /** Date ISO pour un jour, libellé lisible pour une semaine ou la période. */
   label: string;
-  direction: Direction;
+  direction: Measure;
   declared: number;
   computed: number;
   ok: boolean;
+  /** Bornes ISO — renseignées pour les semaines, afin de recalculer côté client. */
+  from?: string;
+  to?: string;
 }
 
 export interface AnalysisReport {

@@ -99,8 +99,8 @@ export default function DashboardPage() {
   const showElsewhereHint =
     !loading &&
     summary !== null &&
-    summary.totalIncome === 0 &&
-    summary.totalExpense === 0 &&
+    summary.income.total === 0 &&
+    summary.expense.total === 0 &&
     allTimeCount > 0 &&
     recent.length > 0;
 

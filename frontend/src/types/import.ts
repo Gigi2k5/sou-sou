@@ -1,5 +1,12 @@
 export type ImportDirection = "income" | "expense";
 
+/**
+ * Ce que mesure un contrôle. `gross` = toutes lignes confondues : c'est le cas
+ * dominant, un carnet écrivant « Total = 32000 » sans distinguer les sens.
+ * Cette référence-là ne bouge pas quand l'utilisateur reclasse une ligne.
+ */
+export type ImportMeasure = ImportDirection | "gross";
+
 /** Une transaction comprise par l'analyse, avant relecture. */
 export interface ImportLine {
   date: string;
@@ -12,15 +19,20 @@ export interface ImportLine {
 
 /**
  * Un contrôle chiffré : ce que le document ANNONCE face à ce qui a été extrait.
- * `scope: "day"` porte un libellé au format ISO (`2026-08-01`).
+ * `scope: "day"` porte un libellé au format ISO (`2026-08-01`) ; `"week"` porte
+ * en plus ses bornes, ce qui permet de le recalculer après correction.
  */
 export interface ImportCheckpoint {
-  scope: "period" | "day";
+  scope: "period" | "week" | "day";
+  /** Date ISO pour un jour, libellé lisible pour une semaine ou la période. */
   label: string;
-  direction: ImportDirection;
+  direction: ImportMeasure;
   declared: number;
   computed: number;
   ok: boolean;
+  /** Bornes ISO — présentes sur les semaines, pour recalculer après correction. */
+  from?: string;
+  to?: string;
 }
 
 export interface ImportAnalysis {

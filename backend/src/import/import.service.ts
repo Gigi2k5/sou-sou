@@ -14,6 +14,8 @@ import type {
   Checkpoint,
   Direction,
   ExtractedLine,
+  ExtractionResult,
+  Measure,
 } from './import.types';
 
 /** Tolérance sur les contrôles de totaux. Les montants sont entiers en FCFA. */
@@ -185,71 +187,108 @@ export class ImportService {
    * rangée du mauvais côté. Un carnet qui porte ses totaux se vérifie tout seul.
    */
   private buildCheckpoints(
-    raw: {
-      declaredPeriodTotals?: { income?: number; expense?: number };
-      declaredDailyTotals?: {
-        date: string;
-        income?: number;
-        expense?: number;
-      }[];
-    },
+    raw: ExtractionResult,
     lines: ExtractedLine[],
   ): Checkpoint[] {
     const checks: Checkpoint[] = [];
 
     const push = (
-      scope: 'period' | 'day',
+      scope: Checkpoint['scope'],
       label: string,
-      direction: Direction,
+      measure: Measure,
       declared: number | null,
       computed: number,
+      bounds?: { from: string; to: string },
     ) => {
       if (declared === null) return;
       checks.push({
         scope,
         label,
-        direction,
+        direction: measure,
         declared,
         computed,
         ok: Math.abs(declared - computed) <= CHECK_TOLERANCE,
+        ...bounds,
       });
     };
 
+    /**
+     * Confronte un sous-ensemble de lignes aux totaux annoncés pour lui.
+     *
+     * `gross` est le cas dominant — un carnet écrit « Total = 32000 » sans rien
+     * distinguer. On le compare alors à la somme de TOUTES les lignes, quel que
+     * soit leur sens. C'est ce qui rend la référence immobile : que
+     * l'utilisateur rebascule une ligne d'entrée en sortie ne change pas le
+     * total du jour, donc ne fabrique pas d'écart imaginaire.
+     */
+    const compare = (
+      scope: Checkpoint['scope'],
+      label: string,
+      declared: { gross?: number; income?: number; expense?: number },
+      subset: ExtractedLine[],
+      bounds?: { from: string; to: string },
+    ) => {
+      const gross = finiteOrNull(declared.gross);
+      if (gross !== null) {
+        push(scope, label, 'gross', gross, sum(subset), bounds);
+        return;
+      }
+      push(
+        scope,
+        label,
+        'expense',
+        finiteOrNull(declared.expense),
+        sum(subset.filter((l) => l.direction === 'expense')),
+        bounds,
+      );
+      push(
+        scope,
+        label,
+        'income',
+        finiteOrNull(declared.income),
+        sum(subset.filter((l) => l.direction === 'income')),
+        bounds,
+      );
+    };
+
+    // --- Journées ---
     for (const daily of raw.declaredDailyTotals ?? []) {
       const date = parseIsoDate(daily?.date);
       if (!date) continue;
       const key = date.toISOString().slice(0, 10);
-      const ofDay = lines.filter((l) => l.date === key);
-      push(
+      compare(
         'day',
         key,
-        'expense',
-        finiteOrNull(daily.expense),
-        sum(ofDay.filter((l) => l.direction === 'expense')),
-      );
-      push(
-        'day',
-        key,
-        'income',
-        finiteOrNull(daily.income),
-        sum(ofDay.filter((l) => l.direction === 'income')),
+        daily,
+        lines.filter((l) => l.date === key),
       );
     }
 
-    push(
-      'period',
-      'Total période',
-      'expense',
-      finiteOrNull(raw.declaredPeriodTotals?.expense),
-      sum(lines.filter((l) => l.direction === 'expense')),
-    );
-    push(
-      'period',
-      'Total période',
-      'income',
-      finiteOrNull(raw.declaredPeriodTotals?.income),
-      sum(lines.filter((l) => l.direction === 'income')),
-    );
+    // --- Semaines ---
+    // Pas redondantes avec les journées, et c'est contre-intuitif : sur un
+    // carnet réel, les sept totaux journaliers d'une semaine tombaient juste un
+    // par un, mais leur somme faisait 22 050 quand la ligne « Total
+    // hebdomadaire S4 » en annonçait 24 050. L'erreur d'addition ne vit qu'à
+    // l'étage de la semaine — aucun contrôle journalier ne pouvait la voir.
+    for (const week of raw.declaredWeeklyTotals ?? []) {
+      const from = parseIsoDate(week?.from);
+      const to = parseIsoDate(week?.to);
+      if (!from || !to) continue;
+      const fromKey = from.toISOString().slice(0, 10);
+      const toKey = to.toISOString().slice(0, 10);
+      if (fromKey > toKey) continue;
+
+      compare(
+        'week',
+        week.label?.trim() || `Semaine du ${fromKey}`,
+        week,
+        lines.filter((l) => l.date >= fromKey && l.date <= toKey),
+        { from: fromKey, to: toKey },
+      );
+    }
+
+    // --- Période entière ---
+    compare('period', 'Total période', raw.declaredPeriodTotals ?? {}, lines);
 
     return checks;
   }

@@ -89,16 +89,26 @@ export function DayCard({
           mismatch » ne se corrige pas. */}
       {hasGap && (
         <div className="border-t border-amber-200 bg-amber-100/60 px-4 py-2.5 text-xs text-amber-900 dark:border-amber-800/60 dark:bg-amber-900/30 dark:text-amber-100">
+          {/* « toutes lignes confondues » quand le carnet n'écrit qu'un total
+              unique : c'est ce qu'il compare lui-même, et ça ne bouge pas quand
+              on reclasse une ligne. */}
+          <Gap
+            label="toutes lignes confondues"
+            declared={report.declared.gross}
+            computed={report.computedGross}
+            gap={report.grossGap}
+            currency={currency}
+          />
           <Gap
             label="sorties"
-            declared={report.declaredExpense}
+            declared={report.declared.expense}
             computed={report.computedExpense}
             gap={report.expenseGap}
             currency={currency}
           />
           <Gap
             label="entrées"
-            declared={report.declaredIncome}
+            declared={report.declared.income}
             computed={report.computedIncome}
             gap={report.incomeGap}
             currency={currency}

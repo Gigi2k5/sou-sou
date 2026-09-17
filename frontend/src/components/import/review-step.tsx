@@ -11,12 +11,15 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { AuditSummary } from "@/components/import/audit-summary";
 import { CategoryRemap } from "@/components/import/category-remap";
 import { DayCard } from "@/components/import/day-card";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
 import {
   buildDayReports,
+  buildVerdict,
+  buildWeekReports,
   declaredByDay,
   groupByCategory,
   totalsOf,
@@ -63,6 +66,14 @@ export function ReviewStep({
   const reports = useMemo(
     () => buildDayReports(lines, declared),
     [lines, declared],
+  );
+  const weeks = useMemo(
+    () => buildWeekReports(lines, analysis.checkpoints),
+    [lines, analysis.checkpoints],
+  );
+  const verdict = useMemo(
+    () => buildVerdict(lines, analysis.checkpoints),
+    [lines, analysis.checkpoints],
   );
   const groups = useMemo(() => groupByCategory(lines), [lines]);
   const totals = useMemo(() => totalsOf(lines), [lines]);
@@ -157,6 +168,9 @@ export function ReviewStep({
           </p>
         )}
       </section>
+
+      {/* --- Le verdict d'ensemble : le carnet contre lui-même --- */}
+      <AuditSummary verdict={verdict} weeks={weeks} currency={currency} />
 
       {/* --- Les journées en écart, ouvertes d'office --- */}
       {flagged.length > 0 && (
