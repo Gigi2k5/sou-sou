@@ -185,6 +185,15 @@ export interface NotebookVerdict {
   computed: number;
   gap: number;
   ok: boolean;
+  /**
+   * Plage réellement couverte par les totaux comparés. Renseignée quand le
+   * verdict s'appuie sur les semaines : celles-ci s'arrêtent souvent avant la
+   * fin du carnet, et il faut le dire plutôt que de laisser croire que tout a
+   * été vérifié.
+   */
+  coverage: { from: string; to: string } | null;
+  /** Nombre de lignes hors de cette couverture, donc non confrontées. */
+  uncoveredLines: number;
 }
 
 /**
@@ -206,10 +215,17 @@ export function buildVerdict(
   const period = declaredPeriod(checkpoints);
 
   if (period.gross !== null) {
-    return verdict("period", "gross", period.gross, total(lines, "gross"));
+    return verdict("period", "gross", period.gross, total(lines, "gross"), null, 0);
   }
   if (period.expense !== null) {
-    return verdict("period", "expense", period.expense, total(lines, "expense"));
+    return verdict(
+      "period",
+      "expense",
+      period.expense,
+      total(lines, "expense"),
+      null,
+      0,
+    );
   }
 
   const weeks = buildWeekReports(lines, checkpoints);
@@ -223,12 +239,32 @@ export function buildVerdict(
   // On ne somme que si TOUTES les semaines portent la même mesure : mélanger
   // un total brut et un total de sorties donnerait un chiffre qui ne veut rien
   // dire.
+  // ⚠️ On ne compare QUE les lignes couvertes par les semaines.
+  //
+  // Un carnet s'arrête souvent en plein milieu d'une semaine : celui qui a
+  // révélé le bug couvrait les 1er au 16 août par ses totaux hebdomadaires,
+  // mais contenait aussi le 17. Sommer tous les totaux d'un côté et toutes les
+  // lignes de l'autre accusait un carnet juste d'un écart de 4 500 F — soit
+  // très exactement cette journée du 17, comptée d'un seul côté de la balance.
+  const coverage = { from: sorted[0].from, to: sorted[sorted.length - 1].to };
+  const covered = lines.filter(
+    (l) => l.date >= coverage.from && l.date <= coverage.to,
+  );
+  const uncovered = lines.length - covered.length;
+
   for (const measure of ["gross", "expense"] as const) {
     if (sorted.every((w) => w.declared[measure] !== null)) {
       const declared = round(
         sorted.reduce((acc, w) => acc + (w.declared[measure] ?? 0), 0),
       );
-      return verdict("weeks", measure, declared, total(lines, measure));
+      return verdict(
+        "weeks",
+        measure,
+        declared,
+        total(covered, measure),
+        coverage,
+        uncovered,
+      );
     }
   }
   return null;
@@ -321,6 +357,8 @@ function verdict(
   measure: NotebookVerdict["measure"],
   declared: number,
   computed: number,
+  coverage: NotebookVerdict["coverage"],
+  uncoveredLines: number,
 ): NotebookVerdict {
   const gap = round(declared - computed);
   return {
@@ -330,6 +368,8 @@ function verdict(
     computed,
     gap,
     ok: Math.abs(gap) <= TOLERANCE,
+    coverage,
+    uncoveredLines,
   };
 }
 

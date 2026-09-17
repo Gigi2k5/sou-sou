@@ -17,6 +17,7 @@ import type {
   ExtractionResult,
   Measure,
 } from './import.types';
+import type { DeclaredWeeklyTotal } from './import.types';
 
 /** Tolérance sur les contrôles de totaux. Les montants sont entiers en FCFA. */
 const CHECK_TOLERANCE = 0.5;
@@ -109,6 +110,9 @@ export class ImportService {
       },
       checkpoints,
       checkSummary: { passed, total: checkpoints.length },
+      // Un contrôle porte sur un sens précis → le document sépare les deux.
+      // Uniquement des contrôles bruts → il ne les sépare pas.
+      directionsVerifiable: checkpoints.some((c) => c.direction !== 'gross'),
       categories: split(
         lines.filter((l) => l.direction === 'expense'),
         knownCategories,
@@ -270,20 +274,13 @@ export class ImportService {
     // par un, mais leur somme faisait 22 050 quand la ligne « Total
     // hebdomadaire S4 » en annonçait 24 050. L'erreur d'addition ne vit qu'à
     // l'étage de la semaine — aucun contrôle journalier ne pouvait la voir.
-    for (const week of raw.declaredWeeklyTotals ?? []) {
-      const from = parseIsoDate(week?.from);
-      const to = parseIsoDate(week?.to);
-      if (!from || !to) continue;
-      const fromKey = from.toISOString().slice(0, 10);
-      const toKey = to.toISOString().slice(0, 10);
-      if (fromKey > toKey) continue;
-
+    for (const week of resolveWeeks(raw.declaredWeeklyTotals, lines)) {
       compare(
         'week',
-        week.label?.trim() || `Semaine du ${fromKey}`,
-        week,
-        lines.filter((l) => l.date >= fromKey && l.date <= toKey),
-        { from: fromKey, to: toKey },
+        week.label,
+        week.declared,
+        lines.filter((l) => l.date >= week.from && l.date <= week.to),
+        { from: week.from, to: week.to },
       );
     }
 
@@ -436,6 +433,72 @@ export class ImportService {
 // -----------------------------------------------------------------------------
 // Utilitaires
 // -----------------------------------------------------------------------------
+
+/**
+ * Fixe les bornes réelles de chaque total hebdomadaire.
+ *
+ * ⚠️ On ne fait PAS confiance à la date de début renvoyée par le modèle. Sur un
+ * carnet réel, « Total hebdomadaire S2 » a été extrait comme couvrant le 08 au
+ * 09 alors qu'il couvrait le 03 au 09 : cinq journées manquantes, un écart
+ * fantôme de 14 700 F, et un carnet parfaitement juste accusé d'être faux.
+ *
+ * La raison est structurelle : dans ces carnets une semaine n'écrit jamais son
+ * début. Elle est définie par sa POSITION — elle couvre tout ce qui va du total
+ * hebdomadaire précédent jusqu'au sien. On déduit donc le début au lieu de le
+ * demander. La date de fin, elle, est fiable : c'est le dernier jour écrit juste
+ * avant la ligne de total.
+ *
+ * Si les fins ne sont pas strictement croissantes, on renonce à tous les
+ * contrôles hebdomadaires : mieux vaut ne rien vérifier que désigner de faux
+ * coupables.
+ */
+function resolveWeeks(
+  declared: DeclaredWeeklyTotal[] | undefined,
+  lines: ExtractedLine[],
+): {
+  label: string;
+  from: string;
+  to: string;
+  declared: { gross?: number; income?: number; expense?: number };
+}[] {
+  if (!declared?.length || lines.length === 0) return [];
+
+  const parsed = declared
+    .map((w) => {
+      const to = parseIsoDate(w?.to);
+      return to ? { raw: w, to: to.toISOString().slice(0, 10) } : null;
+    })
+    .filter((w): w is { raw: DeclaredWeeklyTotal; to: string } => w !== null)
+    .sort((a, b) => a.to.localeCompare(b.to));
+
+  if (parsed.length !== declared.length) return [];
+  for (let i = 1; i < parsed.length; i += 1) {
+    if (parsed[i].to <= parsed[i - 1].to) return [];
+  }
+
+  let cursor = lines.reduce(
+    (min, l) => (l.date < min ? l.date : min),
+    lines[0].date,
+  );
+
+  return parsed.map(({ raw, to }, i) => {
+    const from = cursor;
+    cursor = nextDay(to);
+    return {
+      label: raw.label?.trim() || `Semaine ${i + 1}`,
+      from,
+      to,
+      declared: { gross: raw.gross, income: raw.income, expense: raw.expense },
+    };
+  });
+}
+
+/** Lendemain d'une date ISO, en ISO. */
+function nextDay(iso: string): string {
+  const d = new Date(`${iso}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
 
 function sum(lines: { amount: number }[]): number {
   return Math.round(lines.reduce((acc, l) => acc + l.amount, 0) * 100) / 100;

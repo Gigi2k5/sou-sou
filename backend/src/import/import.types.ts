@@ -99,6 +99,15 @@ export interface AnalysisReport {
     declaredExpense: number | null;
   };
   checkpoints: Checkpoint[];
+  /**
+   * Le document distingue-t-il lui-même entrées et sorties ?
+   *
+   * Faux quand il n'écrit qu'un total unique par jour (« Total = 10925 »). Dans
+   * ce cas AUCUN contrôle ne peut valider le sens d'une ligne : reclasser une
+   * entrée en sortie ne change pas un total brut. Les lignes rangées en entrée
+   * sont alors des suppositions du modèle, à faire confirmer une par une.
+   */
+  directionsVerifiable: boolean;
   /** Résumé lisible : combien de contrôles passent. */
   checkSummary: { passed: number; total: number };
   /** Catégories citées par le modèle, séparées en connues / à créer. */

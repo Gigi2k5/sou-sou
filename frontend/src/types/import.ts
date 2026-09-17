@@ -46,6 +46,12 @@ export interface ImportAnalysis {
   };
   checkpoints: ImportCheckpoint[];
   checkSummary: { passed: number; total: number };
+  /**
+   * Le document distingue-t-il lui-même entrées et sorties ? Faux quand il
+   * n'écrit qu'un total unique par jour : le sens des lignes n'est alors
+   * vérifiable par aucun calcul, il doit être confirmé à la main.
+   */
+  directionsVerifiable: boolean;
   categories: { known: string[]; toCreate: string[] };
   incomeSources: { known: string[]; toCreate: string[] };
   /** `ONLY_EXPENSES` est un code ; les autres entrées sont des phrases. */

@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 
 import { AuditSummary } from "@/components/import/audit-summary";
 import { CategoryRemap } from "@/components/import/category-remap";
+import { UnverifiedDirections } from "@/components/import/unverified-directions";
 import { DayCard } from "@/components/import/day-card";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
@@ -79,6 +80,22 @@ export function ReviewStep({
   const totals = useMemo(() => totalsOf(lines), [lines]);
 
   const flagged = reports.filter((r) => r.hasGap);
+  const weeksInGap = weeks.filter((w) => w.hasGap);
+  /**
+   * Un seul verdict pour tout l'écran.
+   *
+   * Le bandeau annonçait « tout est vérifié » en ne regardant que les journées,
+   * pendant que l'audit juste en dessous affichait un écart hebdomadaire. Deux
+   * messages contradictoires à trois centimètres l'un de l'autre : l'utilisateur
+   * ne sait plus lequel croire, et perd confiance dans les deux.
+   */
+  const somethingOff =
+    flagged.length > 0 || weeksInGap.length > 0 || (verdict !== null && !verdict.ok);
+
+  // Sens invérifiables : voir UnverifiedDirections.
+  const unverifiedIncome = analysis.directionsVerifiable
+    ? []
+    : lines.filter((l) => l.direction === "income");
   const verified = reports.filter((r) => r.verifiable && !r.hasGap);
   const unverifiable = reports.filter((r) => !r.verifiable);
 
@@ -121,24 +138,20 @@ export function ReviewStep({
       <section
         className={cn(
           "rounded-2xl border p-4 sm:p-5",
-          flagged.length > 0
+          somethingOff
             ? "border-amber-300 bg-amber-50 dark:border-amber-700/60 dark:bg-amber-950/25"
             : "border-emerald-300 bg-emerald-50 dark:border-emerald-700/60 dark:bg-emerald-950/25",
         )}
       >
         <div className="flex items-start gap-3">
-          {flagged.length > 0 ? (
+          {somethingOff ? (
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600 dark:text-amber-400" />
           ) : (
             <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600 dark:text-emerald-400" />
           )}
           <div className="min-w-0">
             <h2 className="font-serif text-lg text-sousou-secondary">
-              {flagged.length > 0
-                ? `${flagged.length} journée${flagged.length > 1 ? "s" : ""} à vérifier`
-                : verified.length > 0
-                  ? "Tout est vérifié"
-                  : "Analyse terminée"}
+              {headline(flagged.length, weeksInGap.length, verified.length)}
             </h2>
             <p className="mt-0.5 text-sm text-sousou-neutral">
               {lines.length} transaction{lines.length > 1 ? "s" : ""}
@@ -170,7 +183,18 @@ export function ReviewStep({
       </section>
 
       {/* --- Le verdict d'ensemble : le carnet contre lui-même --- */}
-      <AuditSummary verdict={verdict} weeks={weeks} currency={currency} />
+      <AuditSummary
+        verdict={verdict}
+        weeks={weeks}
+        days={reports}
+        currency={currency}
+      />
+
+      <UnverifiedDirections
+        incomeLines={unverifiedIncome}
+        currency={currency}
+        onFlip={(uid) => onChange(uid, { direction: "expense", category: undefined })}
+      />
 
       {/* --- Les journées en écart, ouvertes d'office --- */}
       {flagged.length > 0 && (
@@ -277,4 +301,13 @@ function unique(values: (string | undefined)[]): string[] {
         .filter((v): v is string => !!v && v !== "(sans catégorie)"),
     ),
   ].sort((a, b) => a.localeCompare(b, "fr"));
+}
+
+/** Un titre unique, qui tient compte des journées comme des semaines. */
+function headline(days: number, weeks: number, verified: number): string {
+  const parts: string[] = [];
+  if (days > 0) parts.push(`${days} journée${days > 1 ? "s" : ""}`);
+  if (weeks > 0) parts.push(`${weeks} semaine${weeks > 1 ? "s" : ""}`);
+  if (parts.length > 0) return `${parts.join(" et ")} à vérifier`;
+  return verified > 0 ? "Tout est vérifié" : "Analyse terminée";
 }
