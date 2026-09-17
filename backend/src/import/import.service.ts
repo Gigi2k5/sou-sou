@@ -12,7 +12,6 @@ import { GeminiService } from './gemini.service';
 import type {
   AnalysisReport,
   Checkpoint,
-  Direction,
   ExtractedLine,
   ExtractionResult,
   Measure,
