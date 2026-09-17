@@ -130,7 +130,21 @@ export default function ImportPage() {
     }
   }, [result]);
 
-  const onlyExpenses = analysis?.warnings.includes("ONLY_EXPENSES") ?? false;
+  /**
+   * « Ce carnet ne contient que des dépenses » se lit sur le résultat ÉCRIT,
+   * pas sur le diagnostic d'analyse.
+   *
+   * Le serveur pose ce constat au moment de l'analyse, avant toute correction.
+   * Or c'est précisément une ligne litigieuse que l'utilisateur vient corriger :
+   * sur un carnet réel, un versement de salaire avait été lu comme une entrée,
+   * puis rebasculé en sortie dans l'écran de revue. L'import final ne contenait
+   * plus aucune entrée — mais le diagnostic, figé à l'analyse, disait le
+   * contraire, et l'écran proposant de saisir ses revenus ne s'affichait pas.
+   *
+   * `importedIncomeTotal` vient du commit : c'est ce qui est réellement en base.
+   */
+  const onlyExpenses =
+    result !== null && result.lineCount > 0 && result.importedIncomeTotal === 0;
   const lastDate =
     lines.length > 0
       ? lines.reduce((max, l) => (l.date > max ? l.date : max), lines[0].date)

@@ -139,6 +139,7 @@ export default function TransactionsPage() {
           <Button
             variant="outline"
             size="sm"
+            nativeButton={false}
             render={
               <Link href="/import">
                 <Upload className="size-4" />

@@ -173,8 +173,8 @@ export function DoneStep({
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button
-          type="button"
           className="flex-1"
+          nativeButton={false}
           render={
             <Link href="/dashboard">
               Voir mon tableau de bord
@@ -183,9 +183,9 @@ export function DoneStep({
           }
         />
         <Button
-          type="button"
           variant="outline"
           className="flex-1"
+          nativeButton={false}
           render={<Link href="/transactions">Voir mes transactions</Link>}
         />
       </div>
