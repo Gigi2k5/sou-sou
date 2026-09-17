@@ -143,8 +143,7 @@ export default function ImportPage() {
    *
    * `importedIncomeTotal` vient du commit : c'est ce qui est réellement en base.
    */
-  const onlyExpenses =
-    result !== null && result.lineCount > 0 && result.importedIncomeTotal === 0;
+  const onlyExpenses = result !== null && missingIncome(result);
   const lastDate =
     lines.length > 0
       ? lines.reduce((max, l) => (l.date > max ? l.date : max), lines[0].date)
@@ -194,4 +193,24 @@ export default function ImportPage() {
       )}
     </div>
   );
+}
+
+/**
+ * Les revenus manquent-ils manifestement à cet import ?
+ *
+ * Le seuil était `=== 0`, et c'était trop littéral. Cas réel : un carnet de
+ * 98 lignes importé avec 86 225 F de sorties et 500 F d'entrées — une seule
+ * ligne, « Merveille remboursement », que le modèle avait rangée du mauvais
+ * côté. La condition devenait fausse, l'écran ne s'affichait pas, et le solde
+ * annonçait −85 725 F : exactement le désastre que cet écran doit éviter.
+ *
+ * Ce qui compte n'est pas que les entrées soient nulles, c'est qu'elles soient
+ * dérisoires face aux sorties. Un cinquième est un seuil volontairement large :
+ * mieux vaut proposer d'ajouter ses revenus à quelqu'un qui n'en a pas besoin —
+ * il passe son chemin en un clic — que laisser un solde absurde à quelqu'un qui
+ * en aurait eu besoin.
+ */
+function missingIncome(result: CommitImportResult): boolean {
+  if (result.lineCount === 0) return false;
+  return result.importedIncomeTotal < result.importedExpenseTotal * 0.2;
 }

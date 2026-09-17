@@ -125,10 +125,27 @@ export function DoneStep({
             Il manque tes revenus
           </h3>
           <p className="mt-1 text-sm text-sousou-neutral">
-            Tes notes ne listaient que des dépenses. Sans tes entrées
-            d&apos;argent, ton solde affichera{" "}
+            {result.importedIncomeTotal === 0 ? (
+              <>Tes notes ne listaient que des dépenses.</>
+            ) : (
+              <>
+                Tes notes contiennent{" "}
+                <strong>
+                  {formatMoney(result.importedIncomeTotal, currency)}
+                </strong>{" "}
+                d&apos;entrées pour{" "}
+                <strong>
+                  {formatMoney(result.importedExpenseTotal, currency)}
+                </strong>{" "}
+                de sorties — il manque presque sûrement tes revenus.
+              </>
+            )}{" "}
+            Sans eux, ton solde affichera{" "}
             <strong className="text-rose-600 dark:text-rose-400">
-              −{formatMoney(result.importedExpenseTotal, currency)}
+              −{formatMoney(
+                result.importedExpenseTotal - result.importedIncomeTotal,
+                currency,
+              )}
             </strong>
             , ce qui ne veut rien dire. Ajoute ce que tu as gagné sur la période.
           </p>
@@ -158,6 +175,7 @@ export function DoneStep({
             </div>
             <Button
               type="button"
+              className="h-11 w-full sm:w-auto"
               onClick={() => void handleAddIncome()}
               disabled={saving || !amount.trim()}
             >
@@ -173,7 +191,7 @@ export function DoneStep({
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <Button
-          className="flex-1"
+          className="h-11 w-full sm:flex-1"
           nativeButton={false}
           render={
             <Link href="/dashboard">
@@ -184,7 +202,7 @@ export function DoneStep({
         />
         <Button
           variant="outline"
-          className="flex-1"
+          className="h-11 w-full sm:flex-1"
           nativeButton={false}
           render={
             <Link href="/transactions?range=all">Voir mes transactions</Link>
@@ -198,7 +216,7 @@ export function DoneStep({
         type="button"
         onClick={onUndo}
         disabled={undoing}
-        className="mx-auto flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs text-sousou-neutral transition-colors hover:bg-muted hover:text-rose-600 disabled:opacity-50"
+        className="mx-auto flex h-11 items-center gap-1.5 rounded-lg px-4 text-xs text-sousou-neutral transition-colors hover:bg-muted hover:text-rose-600 disabled:opacity-50"
       >
         <Undo2 className="size-3.5" />
         {undoing
