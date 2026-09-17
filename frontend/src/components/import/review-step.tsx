@@ -132,7 +132,7 @@ export function ReviewStep({
     <motion.div
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4 pb-28"
+      className="space-y-4 pb-40 lg:pb-28"
     >
       {/* --- Verdict : la première chose qu'on lit --- */}
       <section
@@ -243,11 +243,12 @@ export function ReviewStep({
       )}
 
       {/* --- Barre d'action fixe : le total à importer reste toujours visible --- */}
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:left-64">
+      <div className="fixed inset-x-0 bottom-14 z-40 border-t border-border/60 bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/80 lg:bottom-0 lg:left-64">
         <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <Button
             type="button"
             variant="ghost"
+            className="h-11 px-3"
             onClick={onBack}
             disabled={committing}
           >
@@ -272,6 +273,7 @@ export function ReviewStep({
 
           <Button
             type="button"
+            className="h-11 px-4"
             onClick={onCommit}
             disabled={committing || lines.length === 0}
           >

@@ -214,6 +214,7 @@ function TransactionsPageInner() {
           <Button
             variant="outline"
             size="sm"
+            className="h-10"
             nativeButton={false}
             render={
               <Link href="/import">

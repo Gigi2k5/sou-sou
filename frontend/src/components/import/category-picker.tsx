@@ -80,14 +80,14 @@ export function CategoryPicker({
           }}
           placeholder="Nom de la catégorie"
           maxLength={60}
-          className="h-9 text-sm"
+          className="h-10 text-sm"
           aria-label="Nom de la nouvelle catégorie"
         />
         <button
           type="button"
           onClick={confirm}
           disabled={!draft.trim()}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-sousou-primary-700 hover:bg-sousou-primary-50 disabled:opacity-40 dark:text-sousou-primary dark:hover:bg-sousou-primary/15"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-sousou-primary-700 hover:bg-sousou-primary-50 disabled:opacity-40 dark:text-sousou-primary dark:hover:bg-sousou-primary/15"
           aria-label="Valider la catégorie"
         >
           <Check className="size-4" />
@@ -98,7 +98,7 @@ export function CategoryPicker({
             setCreating(false);
             setDraft("");
           }}
-          className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-sousou-neutral hover:bg-muted"
+          className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-sousou-neutral hover:bg-muted"
           aria-label="Annuler"
         >
           <X className="size-4" />
@@ -120,7 +120,7 @@ export function CategoryPicker({
         onChange(next || undefined);
       }}
     >
-      <SelectTrigger className={cn("h-9 text-sm", className)} aria-label={ariaLabel}>
+      <SelectTrigger className={cn("h-10 text-sm", className)} aria-label={ariaLabel}>
         <SelectValue placeholder="Sans catégorie" />
       </SelectTrigger>
       <SelectContent>

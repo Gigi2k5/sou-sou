@@ -75,7 +75,7 @@ export function UnverifiedDirections({
             <Button
               variant="outline"
               size="sm"
-              className="shrink-0"
+              className="h-10 shrink-0"
               onClick={() => onFlip(line.uid)}
             >
               <ArrowUpRight className="size-3.5" />

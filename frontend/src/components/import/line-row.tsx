@@ -43,7 +43,7 @@ export function LineRow({
           })
         }
         className={cn(
-          "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition-colors",
+          "inline-flex h-10 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs font-semibold transition-colors",
           isIncome
             ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-200"
             : "bg-rose-100 text-rose-800 hover:bg-rose-200 dark:bg-rose-900/40 dark:text-rose-200",
@@ -82,7 +82,7 @@ export function LineRow({
       <button
         type="button"
         onClick={() => onDelete(line.uid)}
-        className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg text-sousou-neutral transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30"
+        className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg text-sousou-neutral transition-colors hover:bg-rose-50 hover:text-rose-600 dark:hover:bg-rose-900/30"
         aria-label={`Supprimer ${line.label}`}
         title="Ne pas importer cette ligne"
       >
