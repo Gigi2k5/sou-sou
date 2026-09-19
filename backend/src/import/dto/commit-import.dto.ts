@@ -82,4 +82,13 @@ export class CommitImportDto {
   @IsNumber()
   @Min(0)
   declaredExpenseTotal?: number;
+
+  @ApiPropertyOptional({
+    enum: ['TEXT', 'FILE'],
+    description:
+      "Provenance du lot. `FILE` quand les lignes viennent d'un tableur lu par le navigateur — l'historique des imports devient alors lisible pour l'utilisateur, qui reconnaît son fichier.",
+  })
+  @IsOptional()
+  @IsIn(['TEXT', 'FILE'])
+  source?: 'TEXT' | 'FILE';
 }

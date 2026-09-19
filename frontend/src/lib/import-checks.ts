@@ -1,6 +1,7 @@
 import type {
   EditableLine,
   ImportCheckpoint,
+  ImportDirection,
   ImportLine,
 } from "@/types/import";
 
@@ -392,4 +393,78 @@ function total(
 
 function round(n: number): number {
   return Math.round(n * 100) / 100;
+}
+
+// -----------------------------------------------------------------------------
+// Contrôle par catégorie
+// -----------------------------------------------------------------------------
+
+export interface CategoryReport {
+  name: string;
+  direction: ImportDirection;
+  declared: number;
+  computed: number;
+  gap: number;
+  ok: boolean;
+  lineCount: number;
+}
+
+/** Même normalisation que le lecteur de tableur : accents et casse neutralisés. */
+function key(name: string): string {
+  return name
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+/**
+ * Confronte les totaux par rubrique annoncés par le document à ce qui a été lu.
+ *
+ * Ce contrôle ne vient que des tableurs — eux seuls écrivent « Total Nourriture
+ * = 33 025 ». Et sur un tableur, il ne cherche PAS les erreurs de calcul de
+ * l'utilisateur : ses totaux sont des formules, donc toujours cohérents avec ses
+ * lignes. Il vérifie NOTRE lecture. Une ligne sautée, un « 1 275 » à espace
+ * insécable mal lu, une cellule fusionnée ratée : c'est ici que ça se voit, et
+ * nulle part ailleurs.
+ *
+ * Son autre vertu est de désigner l'endroit. « Il manque 600 F » laisse
+ * quarante-huit lignes à relire ; « il manque 600 F dans Déplacement » en laisse
+ * quatorze.
+ */
+export function buildCategoryReports(
+  lines: EditableLine[],
+  checkpoints: ImportCheckpoint[],
+): CategoryReport[] {
+  const declared = checkpoints.filter((c) => c.scope === "category");
+  if (declared.length === 0) return [];
+
+  return declared
+    .map((c) => {
+      // `gross` ne s'applique pas à une rubrique : une catégorie appartient à un
+      // sens. Si le document n'en dit rien, on retombe sur les dépenses, de très
+      // loin le cas dominant.
+      const direction: ImportDirection =
+        c.direction === "income" ? "income" : "expense";
+
+      const matching = lines.filter(
+        (l) => l.direction === direction && key(l.category ?? "") === key(c.label),
+      );
+      const computed = matching.reduce((total, l) => total + l.amount, 0);
+      const gap = computed - c.declared;
+
+      return {
+        name: c.label,
+        direction,
+        declared: c.declared,
+        computed,
+        gap,
+        ok: Math.abs(gap) <= TOLERANCE,
+        lineCount: matching.length,
+      };
+    })
+    // Les écarts d'abord, et les plus gros en tête : c'est là qu'il faut
+    // regarder. Le reste n'est là que pour rassurer.
+    .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap) || a.name.localeCompare(b.name, "fr"));
 }

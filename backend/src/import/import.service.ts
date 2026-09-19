@@ -344,7 +344,7 @@ export class ImportService {
       const batch = await tx.importBatch.create({
         data: {
           userId,
-          source: 'TEXT',
+          source: dto.source ?? 'TEXT',
           periodLabel: dto.periodLabel ?? null,
           lineCount: lines.length,
           importedIncomeTotal,
