@@ -5,8 +5,9 @@ import { useCallback, useState } from "react";
 import { toast } from "sonner";
 
 import { DoneStep } from "@/components/import/done-step";
-import { PasteStep } from "@/components/import/paste-step";
+import { MAX_IMPORT_CHARS, PasteStep } from "@/components/import/paste-step";
 import { ReviewStep } from "@/components/import/review-step";
+import { SheetPicker } from "@/components/import/sheet-picker";
 import { extractApiErrorMessage } from "@/lib/api";
 import {
   analyzeImport,
@@ -15,6 +16,9 @@ import {
   undoImport,
 } from "@/lib/import-api";
 import { declaredPeriod } from "@/lib/import-checks";
+import { type SheetAnalysis, analyzeSheet } from "@/lib/spreadsheet/analyze";
+import { readSpreadsheet, SpreadsheetError } from "@/lib/spreadsheet/read-file";
+import { sheetToText } from "@/lib/spreadsheet/to-text";
 import { useAuth } from "@/providers/auth-provider";
 import type {
   CommitImportResult,
@@ -22,23 +26,29 @@ import type {
   ImportAnalysis,
 } from "@/types/import";
 
-type Step = "paste" | "review" | "done";
+type Step = "paste" | "sheets" | "review" | "done";
 
 export default function ImportPage() {
   const { user } = useAuth();
   const currency = user?.currency ?? "FCFA";
 
   const [step, setStep] = useState<Step>("paste");
+  const [text, setText] = useState("");
   const [analysis, setAnalysis] = useState<ImportAnalysis | null>(null);
   const [lines, setLines] = useState<EditableLine[]>([]);
   const [result, setResult] = useState<CommitImportResult | null>(null);
+  const [sheets, setSheets] = useState<SheetAnalysis[]>([]);
+  /** Provenance du lot, pour que l'historique des imports soit lisible. */
+  const [source, setSource] = useState<"TEXT" | "FILE">("TEXT");
 
+  const [readingFile, setReadingFile] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [committing, setCommitting] = useState(false);
   const [undoing, setUndoing] = useState(false);
 
   const handleAnalyze = useCallback(async (text: string) => {
     setAnalyzing(true);
+    setSource("TEXT");
     try {
       const res = await analyzeImport(text);
       if (res.lines.length === 0) {
@@ -63,6 +73,80 @@ export default function ImportPage() {
       setAnalyzing(false);
     }
   }, []);
+
+  /**
+   * Bascule une feuille lue directement vers l'écran de relecture — ou, si sa
+   * lecture ne se recoupe pas, vers l'analyse par le modèle.
+   *
+   * Le texte de repli vient remplir la zone de collage au lieu de partir tout
+   * seul : l'utilisateur voit exactement ce qui sera envoyé, peut le corriger,
+   * et l'appel — qui coûte du quota et une minute d'attente — reste sa décision.
+   */
+  const chooseSheet = useCallback((chosen: SheetAnalysis) => {
+    if (chosen.verdict === "fallback") {
+      const rendered = sheetToText(chosen.sheet);
+      setText(rendered.slice(0, MAX_IMPORT_CHARS));
+      setStep("paste");
+      toast.warning(
+        `${chosen.reason ?? "Cette feuille m'échappe."} Je l'ai mise en forme ci-dessous — relis, puis lance l'analyse.`,
+        { duration: 10_000 },
+      );
+      return;
+    }
+
+    setSource("FILE");
+    setAnalysis(chosen.analysis);
+    setLines(
+      chosen.analysis.lines.map((l, i) => ({
+        ...l,
+        uid: `${i}-${l.date}-${l.label}`,
+      })),
+    );
+    setStep("review");
+
+    for (const w of chosen.analysis.warnings) {
+      toast.warning(w, { duration: 8000 });
+    }
+    if (chosen.verdict === "reconciled") {
+      toast.success(
+        `Lu directement depuis ton fichier — ${chosen.analysis.checkSummary.total} totaux vérifiés, aucun écart.`,
+      );
+    }
+  }, []);
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setReadingFile(true);
+      try {
+        const read = await readSpreadsheet(file);
+        const analyzed = read.map(analyzeSheet);
+
+        // Les feuilles sans la moindre ligne ni total ne valent pas un choix :
+        // un classeur traîne souvent un onglet « Notes » ou « Paramètres ».
+        const useful = analyzed.filter(
+          (a) => a.analysis.lines.length > 0 || a.parse.declared.length > 0,
+        );
+        const candidates = useful.length > 0 ? useful : analyzed;
+
+        if (candidates.length === 1) {
+          chooseSheet(candidates[0]);
+          return;
+        }
+        setSheets(candidates);
+        setStep("sheets");
+      } catch (err) {
+        toast.error(
+          err instanceof SpreadsheetError
+            ? err.message
+            : "Je n'ai pas réussi à lire ce fichier.",
+          { duration: 8000 },
+        );
+      } finally {
+        setReadingFile(false);
+      }
+    },
+    [chooseSheet],
+  );
 
   const handleChange = useCallback(
     (uid: string, patch: Partial<EditableLine>) => {
@@ -103,6 +187,7 @@ export default function ImportPage() {
         ...(period.expense !== null
           ? { declaredExpenseTotal: period.expense }
           : {}),
+        source,
       });
       setResult(res);
       setStep("done");
@@ -111,7 +196,7 @@ export default function ImportPage() {
     } finally {
       setCommitting(false);
     }
-  }, [analysis, lines]);
+  }, [analysis, lines, source]);
 
   const handleUndo = useCallback(async () => {
     if (!result) return;
@@ -122,6 +207,8 @@ export default function ImportPage() {
       setResult(null);
       setAnalysis(null);
       setLines([]);
+      setSheets([]);
+      setText("");
       setStep("paste");
     } catch (err) {
       toast.error(extractApiErrorMessage(err, "Annulation impossible"));
@@ -163,7 +250,26 @@ export default function ImportPage() {
       </header>
 
       {step === "paste" && (
-        <PasteStep loading={analyzing} onAnalyze={(t) => void handleAnalyze(t)} />
+        <PasteStep
+          loading={analyzing}
+          readingFile={readingFile}
+          text={text}
+          onTextChange={setText}
+          onAnalyze={(t) => void handleAnalyze(t)}
+          onFile={(f) => void handleFile(f)}
+        />
+      )}
+
+      {step === "sheets" && (
+        <SheetPicker
+          sheets={sheets}
+          currency={currency}
+          onPick={chooseSheet}
+          onCancel={() => {
+            setSheets([]);
+            setStep("paste");
+          }}
+        />
       )}
 
       {step === "review" && analysis && (

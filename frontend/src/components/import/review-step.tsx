@@ -12,12 +12,14 @@ import {
 import { useMemo, useState } from "react";
 
 import { AuditSummary } from "@/components/import/audit-summary";
+import { CategoryAudit } from "@/components/import/category-audit";
 import { CategoryRemap } from "@/components/import/category-remap";
 import { UnverifiedDirections } from "@/components/import/unverified-directions";
 import { DayCard } from "@/components/import/day-card";
 import { Button } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
 import {
+  buildCategoryReports,
   buildDayReports,
   buildVerdict,
   buildWeekReports,
@@ -76,6 +78,14 @@ export function ReviewStep({
     () => buildVerdict(lines, analysis.checkpoints),
     [lines, analysis.checkpoints],
   );
+  // Les totaux par rubrique ne viennent que des tableurs, et se recalculent
+  // comme le reste : réaffecter une ligne d'une catégorie à l'autre déplace
+  // l'écart sous les yeux de l'utilisateur.
+  const categoryReports = useMemo(
+    () => buildCategoryReports(lines, analysis.checkpoints),
+    [lines, analysis.checkpoints],
+  );
+  const categoryGaps = categoryReports.filter((r) => !r.ok).length;
   const groups = useMemo(() => groupByCategory(lines), [lines]);
   const totals = useMemo(() => totalsOf(lines), [lines]);
 
@@ -90,13 +100,25 @@ export function ReviewStep({
    * ne sait plus lequel croire, et perd confiance dans les deux.
    */
   const somethingOff =
-    flagged.length > 0 || weeksInGap.length > 0 || (verdict !== null && !verdict.ok);
+    flagged.length > 0 ||
+    weeksInGap.length > 0 ||
+    categoryGaps > 0 ||
+    (verdict !== null && !verdict.ok);
 
   // Sens invérifiables : voir UnverifiedDirections.
   const unverifiedIncome = analysis.directionsVerifiable
     ? []
     : lines.filter((l) => l.direction === "income");
   const verified = reports.filter((r) => r.verifiable && !r.hasGap);
+  /**
+   * Un contrôle — n'importe lequel — a-t-il pu être effectué ? C'est ce qui
+   * distingue « tout concorde » de « je n'avais rien sur quoi m'appuyer ».
+   */
+  const anyCheck =
+    verdict !== null ||
+    categoryReports.length > 0 ||
+    verified.length > 0 ||
+    weeks.length > 0;
   const unverifiable = reports.filter((r) => !r.verifiable);
 
   const categoryOptions = useMemo(
@@ -151,7 +173,12 @@ export function ReviewStep({
           )}
           <div className="min-w-0">
             <h2 className="font-serif text-lg text-sousou-secondary">
-              {headline(flagged.length, weeksInGap.length, verified.length)}
+              {headline(
+                flagged.length,
+                weeksInGap.length,
+                categoryGaps,
+                anyCheck,
+              )}
             </h2>
             <p className="mt-0.5 text-sm text-sousou-neutral">
               {lines.length} transaction{lines.length > 1 ? "s" : ""}
@@ -171,7 +198,7 @@ export function ReviewStep({
 
         {/* Le carnet ne porte aucun total : on le dit franchement plutôt que de
             laisser croire à une vérification qui n'a pas eu lieu. */}
-        {verified.length === 0 && flagged.length === 0 && (
+        {!anyCheck && (
           <p className="mt-3 flex items-start gap-2 rounded-xl bg-card/60 p-3 text-xs text-sousou-neutral">
             <Info className="mt-0.5 size-3.5 shrink-0" />
             <span>
@@ -189,6 +216,9 @@ export function ReviewStep({
         days={reports}
         currency={currency}
       />
+
+      {/* --- Le contrôle par rubrique, quand le document en fournit --- */}
+      <CategoryAudit reports={categoryReports} currency={currency} />
 
       <UnverifiedDirections
         incomeLines={unverifiedIncome}
@@ -305,11 +335,25 @@ function unique(values: (string | undefined)[]): string[] {
   ].sort((a, b) => a.localeCompare(b, "fr"));
 }
 
-/** Un titre unique, qui tient compte des journées comme des semaines. */
-function headline(days: number, weeks: number, verified: number): string {
+/**
+ * Un titre unique, qui tient compte de TOUS les niveaux de contrôle.
+ *
+ * Il en existe quatre — jour, semaine, rubrique, période — et ils n'arrivent
+ * jamais ensemble : un carnet manuscrit fournit des totaux journaliers, un
+ * tableur des totaux par rubrique. N'en regarder qu'une partie, c'est annoncer
+ * « je n'ai rien pu recouper » au-dessus d'un audit qui affiche dix-neuf
+ * contrôles au vert. Ce bandeau et l'audit doivent dire la même chose.
+ */
+function headline(
+  days: number,
+  weeks: number,
+  categories: number,
+  anyCheck: boolean,
+): string {
   const parts: string[] = [];
   if (days > 0) parts.push(`${days} journée${days > 1 ? "s" : ""}`);
   if (weeks > 0) parts.push(`${weeks} semaine${weeks > 1 ? "s" : ""}`);
-  if (parts.length > 0) return `${parts.join(" et ")} à vérifier`;
-  return verified > 0 ? "Tout est vérifié" : "Analyse terminée";
+  if (categories > 0) parts.push(`${categories} rubrique${categories > 1 ? "s" : ""}`);
+  if (parts.length > 0) return `${parts.join(", ")} à vérifier`;
+  return anyCheck ? "Tout est vérifié" : "Analyse terminée";
 }

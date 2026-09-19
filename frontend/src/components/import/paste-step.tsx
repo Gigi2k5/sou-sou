@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ClipboardPaste, Loader2, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { FileDrop } from "@/components/import/file-drop";
 import { MascotAnimated } from "@/components/mascot/mascot-animated";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,11 +29,28 @@ const STAGES = [
 
 interface PasteStepProps {
   loading: boolean;
+  /** Un fichier est en cours de lecture dans le navigateur. */
+  readingFile: boolean;
+  /**
+   * Le texte est piloté par le parent : quand un fichier bascule vers
+   * l'analyse, c'est lui qui vient remplir cette zone. L'utilisateur voit alors
+   * exactement ce qui partira, et peut le corriger — ce qu'un envoi direct du
+   * fichier lui interdirait.
+   */
+  text: string;
+  onTextChange: (next: string) => void;
   onAnalyze: (text: string) => void;
+  onFile: (file: File) => void;
 }
 
-export function PasteStep({ loading, onAnalyze }: PasteStepProps) {
-  const [text, setText] = useState("");
+export function PasteStep({
+  loading,
+  readingFile,
+  text,
+  onTextChange,
+  onAnalyze,
+  onFile,
+}: PasteStepProps) {
   const [stage, setStage] = useState(0);
   const stageRef = useRef(0);
 
@@ -72,6 +90,16 @@ export function PasteStep({ loading, onAnalyze }: PasteStepProps) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-4"
     >
+      <FileDrop busy={readingFile} onFile={onFile} />
+
+      <div className="flex items-center gap-3" aria-hidden>
+        <span className="h-px flex-1 bg-border" />
+        <span className="text-xs uppercase tracking-wide text-sousou-neutral">
+          ou colle
+        </span>
+        <span className="h-px flex-1 bg-border" />
+      </div>
+
       <div className="rounded-2xl border border-border/60 bg-card p-4 sm:p-6">
         <label
           htmlFor="import-text"
@@ -89,7 +117,7 @@ export function PasteStep({ loading, onAnalyze }: PasteStepProps) {
         <Textarea
           id="import-text"
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => onTextChange(e.target.value)}
           rows={14}
           placeholder={
             "Samedi 01/08/2026\nZem = 1000\nRiz = 1350\nTotal = 2350\n\nDimanche 02/08/2026\n…"

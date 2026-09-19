@@ -23,7 +23,13 @@ export interface ImportLine {
  * en plus ses bornes, ce qui permet de le recalculer après correction.
  */
 export interface ImportCheckpoint {
-  scope: "period" | "week" | "day";
+  /**
+   * `category` ne vient que des tableurs : eux seuls annoncent des totaux par
+   * rubrique. C'est le contrôle le plus utile qui soit, parce qu'il ne dit pas
+   * seulement « il manque 600 F » mais « il en manque 600 dans Déplacement » —
+   * la recherche passe de quarante-huit lignes à quatorze.
+   */
+  scope: "period" | "week" | "day" | "category";
   /** Date ISO pour un jour, libellé lisible pour une semaine ou la période. */
   label: string;
   direction: ImportMeasure;
@@ -63,6 +69,12 @@ export interface CommitImportInput {
   periodLabel?: string;
   declaredIncomeTotal?: number;
   declaredExpenseTotal?: number;
+  /**
+   * `FILE` quand les lignes viennent d'un tableur lu par le navigateur. Sans
+   * ça, l'historique des imports annoncerait « collé » à quelqu'un qui a déposé
+   * un fichier — et il ne reconnaîtrait pas son propre import.
+   */
+  source?: "TEXT" | "FILE";
 }
 
 export interface CommitImportResult {
