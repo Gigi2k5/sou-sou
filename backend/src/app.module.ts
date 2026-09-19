@@ -6,6 +6,7 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { AccountModule } from './account/account.module';
 import { AdminModule } from './admin/admin.module';
 import { ArticlesModule } from './articles/articles.module';
 import { AuthModule } from './auth/auth.module';
@@ -66,6 +67,7 @@ import { UsersModule } from './users/users.module';
     BudgetsModule,
     InsightsModule,
     ImportModule,
+    AccountModule,
   ],
   controllers: [AppController],
   providers: [

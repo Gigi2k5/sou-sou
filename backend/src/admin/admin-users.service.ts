@@ -8,6 +8,7 @@ import {
 import { Prisma, type Role } from '@prisma/client';
 
 import { NotificationsService } from '../notifications/notifications.service';
+import { AccountPurgeService } from '../account/account-purge.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AdminLogService } from './admin-log.service';
 import {
@@ -76,11 +77,10 @@ export class AdminUsersService {
     private readonly prisma: PrismaService,
     private readonly adminLog: AdminLogService,
     private readonly notifications: NotificationsService,
+    private readonly purger: AccountPurgeService,
   ) {}
 
-  async list(
-    query: ListAdminUsersDto,
-  ): Promise<{
+  async list(query: ListAdminUsersDto): Promise<{
     items: AdminUserListItem[];
     total: number;
     page: number;
@@ -434,13 +434,11 @@ export class AdminUsersService {
       userId: targetUserId,
       type: 'ADMIN_WARNING',
       title:
-        newRole === 'ADMIN'
-          ? 'Promotion administrateur'
-          : 'Changement de rôle',
+        newRole === 'ADMIN' ? 'Promotion administrateur' : 'Changement de rôle',
       body:
         newRole === 'ADMIN'
           ? "Tu es maintenant administrateur de Sou'Sou."
-          : "Ton rôle administrateur a été retiré.",
+          : 'Ton rôle administrateur a été retiré.',
       data: { from: target.role, to: newRole },
     });
   }
@@ -448,7 +446,7 @@ export class AdminUsersService {
   async remove(adminId: string, targetUserId: string, confirmEmail: string) {
     if (adminId === targetUserId) {
       throw new BadRequestException(
-        'Tu ne peux pas supprimer ton propre compte depuis l\'admin.',
+        "Tu ne peux pas supprimer ton propre compte depuis l'admin.",
       );
     }
     const target = await this.prisma.user.findUnique({
@@ -475,68 +473,14 @@ export class AdminUsersService {
       }
     }
 
-    // Pots groupe actifs avec d'autres membres : on bloque (cf. Q7 hybride).
-    const ownedActivePots = await this.prisma.moneyPot.findMany({
-      where: { ownerId: targetUserId, isGroup: true, isCompleted: false },
-      include: { _count: { select: { members: true } } },
-    });
-    const blocking = ownedActivePots.filter((p) => p._count.members > 1);
-    if (blocking.length > 0) {
-      throw new ConflictException(
-        `Suppression impossible : ${target.name} est créateur de ${blocking.length} pot(s) groupe actif(s) avec d'autres membres (« ${blocking[0].name} »). Demande-lui de transférer ou supprimer ces pots avant.`,
-      );
-    }
+    // Un SEUL chemin de suppression, partagé avec celui que l'utilisateur
+    // déclenche lui-même. Deux implémentations auraient divergé à la première
+    // table ajoutée au schéma — et c'était déjà arrivé : les transactions
+    // récurrentes et les lots d'import survivaient à la suppression.
+    await this.purger.assertDeletable(targetUserId);
 
     await this.prisma.$transaction(async (tx) => {
-      // 1. Pots solo + groupes "vides" (cascade supprime MoneyPotMember,
-      //    catégories POT, et SetNull les Transaction liées).
-      await tx.moneyPot.deleteMany({ where: { ownerId: targetUserId } });
-      // 2. Objectif d'épargne (cascade catégorie SAVINGS + Transaction).
-      await tx.savingsGoal.deleteMany({ where: { userId: targetUserId } });
-      // 3. Catégories de dépenses libres (cascade les Transaction privées).
-      await tx.expenseCategory.deleteMany({
-        where: { userId: targetUserId, kind: 'FREE' },
-      });
-      // 4. Sources de revenu (cascade les Transaction INCOME).
-      await tx.incomeSource.deleteMany({ where: { userId: targetUserId } });
-      // 5. Reste à scrubber : Transactions orphelines (catégorie/source NULL).
-      //    Les Transactions liées à des catégories POT *d'autres pots* (où
-      //    l'user était membre) sont préservées pour ne pas amputer les pots
-      //    des autres membres.
-      await tx.transaction.deleteMany({
-        where: {
-          userId: targetUserId,
-          expenseCategoryId: null,
-          incomeSourceId: null,
-        },
-      });
-      // 6. Données purement privées.
-      await tx.avatarUnlock.deleteMany({ where: { userId: targetUserId } });
-      await tx.userBadge.deleteMany({ where: { userId: targetUserId } });
-      await tx.notification.deleteMany({ where: { userId: targetUserId } });
-      await tx.refreshToken.deleteMany({ where: { userId: targetUserId } });
-      // 7. Soft-delete : scrub PII, ban pour empêcher tout re-login.
-      await tx.user.update({
-        where: { id: targetUserId },
-        data: {
-          email: `deleted-${targetUserId}@anonymized.local`,
-          name: 'Compte supprimé',
-          password: '',
-          avatarUrl: null,
-          totalPoints: 0,
-          currentStreak: 0,
-          bestStreak: 0,
-          lastContributionAt: null,
-          lastLoginAt: null,
-          isBanned: true,
-          banReason: 'Compte supprimé',
-          bannedAt: new Date(),
-          bannedBy: adminId,
-          resetToken: null,
-          resetTokenExpiresAt: null,
-        },
-      });
-      // 8. AdminLog (avant scrub serait perdu si on attendait).
+      await this.purger.purge(tx, targetUserId, adminId);
       await this.adminLog.record(
         {
           adminId,
@@ -619,8 +563,7 @@ export class AdminUsersService {
     if (u.isBanned) return 'banned';
     if (
       !u.lastLoginAt ||
-      Date.now() - u.lastLoginAt.getTime() >
-        INACTIVE_THRESHOLD_DAYS * DAY_MS
+      Date.now() - u.lastLoginAt.getTime() > INACTIVE_THRESHOLD_DAYS * DAY_MS
     ) {
       return 'inactive';
     }

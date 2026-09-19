@@ -12,6 +12,7 @@ import { FieldError } from "@/components/auth/field-error";
 import { AvatarPickerDialog } from "@/components/profile/avatar-picker-dialog";
 import { NamedListManager } from "@/components/tracker/named-list-manager";
 import { Avatar } from "@/components/ui/avatar";
+import { MyDataSection } from "@/components/account/my-data-section";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -185,7 +186,11 @@ function ProfileForm() {
             Donne un visage à ton compte. Il s&apos;affiche dans la nav et à
             côté de tes articles.
           </p>
-          <div className="flex items-center gap-5">
+          {/* `flex-wrap` : le bouton porte `shrink-0` (classe de base de
+              Button), donc sous 340 px il poussait la ligne hors de l'écran et
+              faisait défiler toute la page horizontalement. Défaut préexistant,
+              visible seulement sur les très petits téléphones. */}
+          <div className="flex flex-wrap items-center gap-5">
             <Avatar
               avatarUrl={user.avatarUrl}
               name={user.name}
@@ -287,6 +292,10 @@ function ProfileForm() {
         {isSubmitting ? "Enregistrement..." : "Enregistrer"}
       </Button>
       </form>
+
+      {/* En dernier, volontairement : on ne met pas « supprimer mon compte »
+          au-dessus des réglages qu'on vient consulter tous les jours. */}
+      <MyDataSection />
     </div>
   );
 }
