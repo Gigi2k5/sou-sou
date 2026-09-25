@@ -11,6 +11,7 @@ import { AuthCard } from "@/components/auth/auth-card";
 import { FieldError } from "@/components/auth/field-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { extractApiErrorCode, extractApiErrorMessage } from "@/lib/api";
 import { type LoginValues, loginSchema } from "@/lib/auth-schemas";
@@ -91,9 +92,8 @@ export default function LoginPage() {
               Oublié ?
             </Link>
           </div>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="current-password"
             placeholder="••••••••"
             className="mt-1.5"

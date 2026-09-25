@@ -11,6 +11,7 @@ import { AuthCard } from "@/components/auth/auth-card";
 import { FieldError } from "@/components/auth/field-error";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { extractApiErrorMessage } from "@/lib/api";
 import { type SignupValues, signupSchema } from "@/lib/auth-schemas";
@@ -95,9 +96,8 @@ export default function SignupPage() {
 
         <div>
           <Label htmlFor="password">Mot de passe</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             placeholder="8 caractères minimum"
             className="mt-1.5"
@@ -109,9 +109,8 @@ export default function SignupPage() {
 
         <div>
           <Label htmlFor="confirmPassword">Confirme le mot de passe</Label>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             autoComplete="new-password"
             placeholder="••••••••"
             className="mt-1.5"
