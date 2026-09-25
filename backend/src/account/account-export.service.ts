@@ -9,12 +9,11 @@ import { PrismaService } from '../prisma/prisma.service';
  * on ne fait confiance qu'à ce qu'on peut quitter. Une application où l'on peut
  * tout mettre et rien reprendre n'est pas un outil, c'est un piège.
  *
- * Deux formats, pour deux usages qui n'ont rien à voir :
- *   - CSV, qui s'ouvre dans un tableur. C'est celui que les gens utiliseront
- *     réellement, et c'est le miroir exact de l'import : ce qui entre par un
- *     fichier Excel ressort en fichier Excel.
- *   - JSON, qui contient TOUT, y compris ce qu'un tableau ne sait pas
- *     représenter. C'est celui qui rend la promesse vraie.
+ * Ce service ne produit QUE du JSON, et c'est volontaire : le classeur Excel
+ * est construit dans le navigateur, à partir de cette même réponse, avec la
+ * bibliothèque déjà embarquée pour l'import de tableurs. Deux avantages — aucune
+ * dépendance de mise en forme côté serveur, et surtout la certitude que les deux
+ * formats décrivent exactement les mêmes données, puisqu'ils sortent d'ici.
  */
 @Injectable()
 export class AccountExportService {
@@ -196,56 +195,4 @@ export class AccountExportService {
       commentaires: comments,
     };
   }
-
-  /**
-   * Les transactions en CSV.
-   *
-   * Séparateur point-virgule et BOM UTF-8 : sans les deux, Excel en configuration
-   * française affiche tout dans une seule colonne et massacre les accents. C'est
-   * le format que ce public ouvrira, autant qu'il s'ouvre correctement.
-   */
-  async toCsv(userId: string): Promise<string> {
-    const rows = await this.prisma.transaction.findMany({
-      where: { userId },
-      orderBy: { date: 'asc' },
-      select: {
-        date: true,
-        type: true,
-        amount: true,
-        note: true,
-        expenseCategory: { select: { name: true } },
-        incomeSource: { select: { name: true } },
-      },
-    });
-
-    const header = ['Date', 'Sens', 'Montant', 'Catégorie', 'Note'];
-    const lines = rows.map((t) =>
-      [
-        t.date.toISOString().slice(0, 10),
-        t.type === 'INCOME' ? 'Entrée' : 'Sortie',
-        String(t.amount),
-        t.expenseCategory?.name ?? t.incomeSource?.name ?? '',
-        t.note ?? '',
-      ]
-        .map(escapeCsv)
-        .join(';'),
-    );
-
-    // `\uFEFF` = BOM UTF-8, en échappement plutôt qu'en caractère littéral :
-    // invisible dans l'éditeur, il serait supprimé au premier reformatage.
-    return `\uFEFF${header.join(';')}\n${lines.join('\n')}\n`;
-  }
-}
-
-/**
- * Échappe une cellule CSV.
- *
- * Le préfixe sur `= + - @` neutralise l'injection de formule : une note qui
- * commencerait par `=` serait exécutée comme une formule à l'ouverture du
- * tableur. C'est un vrai vecteur d'attaque, et il vise ici le fichier que
- * l'utilisateur télécharge pour se rassurer.
- */
-function escapeCsv(value: string): string {
-  const risky = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  return /[";\n\r]/.test(risky) ? `"${risky.replace(/"/g, '""')}"` : risky;
 }

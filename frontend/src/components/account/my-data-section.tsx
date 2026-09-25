@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { DeleteAccountDialog } from "@/components/account/delete-account-dialog";
 import { Button } from "@/components/ui/button";
-import { downloadAccountCsv, downloadAccountJson } from "@/lib/account-api";
+import { downloadAccountJson, downloadAccountXlsx } from "@/lib/account-api";
 import { extractApiErrorMessage } from "@/lib/api";
 
 /**
@@ -18,13 +18,13 @@ import { extractApiErrorMessage } from "@/lib/api";
  * endroit dont il ne sait pas comment sortir.
  */
 export function MyDataSection() {
-  const [busy, setBusy] = useState<"csv" | "json" | null>(null);
+  const [busy, setBusy] = useState<"xlsx" | "json" | null>(null);
   const [confirming, setConfirming] = useState(false);
 
-  const run = async (kind: "csv" | "json") => {
+  const run = async (kind: "xlsx" | "json") => {
     setBusy(kind);
     try {
-      await (kind === "csv" ? downloadAccountCsv() : downloadAccountJson());
+      await (kind === "xlsx" ? downloadAccountXlsx() : downloadAccountJson());
       toast.success("Téléchargement lancé.");
     } catch (err) {
       toast.error(extractApiErrorMessage(err, "Téléchargement impossible."));
@@ -48,14 +48,14 @@ export function MyDataSection() {
           <DataButton
             icon={<FileSpreadsheet className="size-5" />}
             title="Télécharger pour Excel"
-            hint="Toutes mes transactions en CSV, prêtes à ouvrir dans un tableur"
-            busy={busy === "csv"}
-            onClick={() => void run("csv")}
+            hint="Un classeur avec une feuille par sujet : transactions, budgets, cotisations…"
+            busy={busy === "xlsx"}
+            onClick={() => void run("xlsx")}
           />
           <DataButton
             icon={<FileJson className="size-5" />}
             title="Télécharger tout"
-            hint="Copie intégrale en JSON : profil, budgets, cotisations, imports, articles"
+            hint="Copie brute en JSON, pour réutiliser mes données dans un autre outil"
             busy={busy === "json"}
             onClick={() => void run("json")}
           />

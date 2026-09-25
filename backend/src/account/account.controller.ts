@@ -51,21 +51,6 @@ export class AccountController {
       .send(JSON.stringify(data, null, 2));
   }
 
-  @Get('export.csv')
-  @Throttle({ default: { limit: 10, ttl: 3_600_000 } })
-  @ApiOperation({ summary: 'Télécharger ses transactions (CSV, pour tableur)' })
-  async exportCsv(@CurrentUser() user: AuthUser, @Res() res: Response) {
-    const csv = await this.exporter.toCsv(user.id);
-    res
-      .status(HttpStatus.OK)
-      .setHeader('Content-Type', 'text/csv; charset=utf-8')
-      .setHeader(
-        'Content-Disposition',
-        `attachment; filename="sousou-transactions-${stamp()}.csv"`,
-      )
-      .send(csv);
-  }
-
   /**
    * Suppression du compte par son propriétaire.
    *
