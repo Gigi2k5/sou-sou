@@ -86,12 +86,20 @@ export function TransactionItem({
           {formatMoney(tx.amount, currency)}
         </span>
 
+        {/* `pointer-fine:` et non plus l'inverse. Ces actions étaient masquées
+            jusqu'au SURVOL — or un doigt ne survole rien. Sur téléphone elles
+            restaient donc invisibles tout en demeurant tapables : impossible de
+            modifier une ligne volontairement, et possible d'ouvrir la
+            suppression sans l'avoir voulu. Elles sont désormais visibles
+            d'emblée au doigt, et ne s'effacent que là où un vrai pointeur
+            existe. */}
         {(onEdit || onDelete) && (
-          <div className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-1">
+          <div className="flex items-center pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 focus-within:opacity-100 transition-opacity ml-1">
             {onEdit && (
               <Button
                 variant="ghost"
                 size="icon-sm"
+                className="pointer-coarse:size-10"
                 onClick={() => onEdit(tx)}
                 aria-label="Modifier"
               >
@@ -104,7 +112,7 @@ export function TransactionItem({
                 size="icon-sm"
                 onClick={() => onDelete(tx)}
                 aria-label="Supprimer"
-                className="hover:text-destructive"
+                className="hover:text-destructive pointer-coarse:size-10"
               >
                 <Trash2 className="size-3.5" />
               </Button>

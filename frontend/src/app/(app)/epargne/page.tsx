@@ -458,7 +458,7 @@ export default function EpargnePage() {
                       size="icon-sm"
                       variant="ghost"
                       onClick={() => setDeleteContrib(c)}
-                      className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity hover:text-destructive"
+                      className="pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 focus-within:opacity-100 transition-opacity hover:text-destructive pointer-coarse:size-10"
                       aria-label="Supprimer"
                     >
                       <Trash2 className="size-3.5" />
@@ -555,9 +555,11 @@ function StatTile({
         </p>
         <p className="font-serif text-xl text-sousou-secondary leading-none tabular-nums">
           {value}
-          <span className="ml-1 text-xs text-sousou-neutral font-sans">
-            {sub}
-          </span>
+          {/* L'espace est SIGNIFIANT : sans lui, aucun retour à la ligne n'est
+              possible entre la valeur et son complément — une marge n'est pas
+              un point de coupure. « 1340 » suivi de « cumulés » débordait donc
+              de la tuile sous 340 px au lieu de passer à la ligne. */}{" "}
+          <span className="text-xs text-sousou-neutral font-sans">{sub}</span>
         </p>
       </div>
     </div>

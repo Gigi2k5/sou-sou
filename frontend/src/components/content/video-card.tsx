@@ -87,7 +87,7 @@ export function VideoCard({
             onDelete(resource);
           }}
           aria-label="Supprimer"
-          className="absolute top-3 right-3 bg-card/95 backdrop-blur shadow-sm hover:text-destructive opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+          className="absolute top-3 right-3 bg-card/95 backdrop-blur shadow-sm hover:text-destructive pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
         >
           <Trash2 className="size-3.5" />
         </Button>
