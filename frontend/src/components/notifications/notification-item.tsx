@@ -238,7 +238,7 @@ export function NotificationItem({
           }}
           className={cn(
             "shrink-0 size-8 rounded-full inline-flex items-center justify-center",
-            "text-sousou-neutral/60 opacity-0 group-hover:opacity-100",
+            "text-sousou-neutral/60 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100",
             "hover:bg-card hover:text-destructive transition-all",
             "focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/30 focus:outline-none",
           )}

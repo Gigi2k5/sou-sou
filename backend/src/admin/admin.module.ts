@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { AdminGuard } from '../auth/guards/admin.guard';
+import { AccountModule } from '../account/account.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { AdminArticlesController } from './admin-articles.controller';
 import { AdminArticlesService } from './admin-articles.service';
@@ -17,7 +18,7 @@ import { AdminUsersController } from './admin-users.controller';
 import { AdminUsersService } from './admin-users.service';
 
 @Module({
-  imports: [NotificationsModule],
+  imports: [NotificationsModule, AccountModule],
   controllers: [
     AdminStatsController,
     AdminUsersController,

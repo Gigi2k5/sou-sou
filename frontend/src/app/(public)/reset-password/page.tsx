@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { AuthCard } from "@/components/auth/auth-card";
 import { FieldError } from "@/components/auth/field-error";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { api, extractApiErrorMessage } from "@/lib/api";
 import {
@@ -107,9 +107,8 @@ function ResetPasswordInner() {
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <div>
           <Label htmlFor="password">Nouveau mot de passe</Label>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
             autoComplete="new-password"
             placeholder="8 caractères minimum"
             className="mt-1.5"
@@ -121,9 +120,8 @@ function ResetPasswordInner() {
 
         <div>
           <Label htmlFor="confirmPassword">Confirme</Label>
-          <Input
+          <PasswordInput
             id="confirmPassword"
-            type="password"
             autoComplete="new-password"
             placeholder="••••••••"
             className="mt-1.5"

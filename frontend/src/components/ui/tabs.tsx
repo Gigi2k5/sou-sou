@@ -15,6 +15,10 @@ function TabsList({
     <TabsPrimitive.List
       className={cn(
         "relative inline-flex items-center gap-1 rounded-2xl bg-muted p-1",
+        // `inline-flex` seul ne rétrécit pas : trois onglets un peu longs
+        // poussaient toute la page hors de l'écran sous 340 px. On laisse la
+        // barre défiler d'elle-même plutôt que d'entraîner la page avec elle.
+        "max-w-full overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
         className,
       )}
       {...props}
