@@ -48,7 +48,7 @@ export function MyDataSection() {
           <DataButton
             icon={<FileSpreadsheet className="size-5" />}
             title="Télécharger pour Excel"
-            hint="Un classeur avec une feuille par sujet : transactions, budgets, cotisations…"
+            hint="Un classeur avec une feuille par sujet : transactions, budgets, épargne, imports…"
             busy={busy === "xlsx"}
             onClick={() => void run("xlsx")}
           />

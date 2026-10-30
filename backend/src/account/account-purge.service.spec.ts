@@ -1,6 +1,13 @@
 import { ConflictException } from '@nestjs/common';
+
+// Le drapeau est remplacé par un objet MUTABLE : les cotisations sont masquées
+// aujourd'hui, mais le garde doit rester testé pour le jour où elles
+// reviendront. Un test qui disparaît avec une fonctionnalité masquée, c'est une
+// régression qui attend sagement son heure.
+jest.mock('../config/features', () => ({ FEATURES: { cotisations: true } }));
 import { Prisma } from '@prisma/client';
 
+import { FEATURES } from '../config/features';
 import { AccountPurgeService } from './account-purge.service';
 
 /**
@@ -180,6 +187,24 @@ describe('AccountPurgeService', () => {
       await expect(service.assertDeletable('u')).rejects.toThrow(
         /Tontine du quartier/,
       );
+    });
+
+    it('ne bloque JAMAIS tant que les cotisations sont masquées', async () => {
+      // C'est l'état réel du produit aujourd'hui, et la raison d'être du
+      // garde-fou : le message demande de terminer sa cotisation d'abord, or
+      // l'écran qui le permet n'est plus accessible. Sans cette exception, la
+      // personne ne pourrait ni gérer sa cotisation, ni supprimer son compte.
+      const flags = FEATURES as unknown as { cotisations: boolean };
+      flags.cotisations = false;
+      try {
+        await expect(
+          withPots([
+            { name: 'Tontine du quartier', members: 4 },
+          ]).assertDeletable('u'),
+        ).resolves.toBeUndefined();
+      } finally {
+        flags.cotisations = true;
+      }
     });
   });
 });
