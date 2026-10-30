@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Award, PiggyBank, Target, Users } from "lucide-react";
+import { Award, PiggyBank, Target } from "lucide-react";
 
 import { StepShell } from "./step-shell";
 
@@ -10,11 +10,6 @@ const FEATURES = [
     icon: PiggyBank,
     title: "Objectif d'épargne",
     body: "Définis un montant cible — Sou'Sou suit ta progression jour après jour.",
-  },
-  {
-    icon: Users,
-    title: "Cotisations entre amis",
-    body: "Crée un pot commun pour mutualiser une dépense (loyer, voyage, projet).",
   },
   {
     icon: Award,

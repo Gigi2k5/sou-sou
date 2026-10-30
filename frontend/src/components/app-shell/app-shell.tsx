@@ -13,7 +13,6 @@ import {
   Upload,
   Shield,
   Sparkles,
-  Target,
   Wallet,
 } from "lucide-react";
 import Link from "next/link";
@@ -43,13 +42,14 @@ interface NavItem {
   mobileOnly?: boolean;
 }
 
+// Les entrées des fonctionnalités désactivées sont retirées ici, à la source :
+// filtrer plus bas obligerait chaque barre de navigation à y penser de son côté.
 const NAV: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", shortLabel: "Accueil", icon: LayoutDashboard },
   { href: "/transactions", label: "Transactions", shortLabel: "Suivi", icon: Receipt },
   { href: "/budgets", label: "Budgets", icon: Wallet, desktopOnly: true },
   { href: "/insights", label: "Analyses", icon: Sparkles, desktopOnly: true },
   { href: "/epargne", label: "Épargne", icon: PiggyBank },
-  { href: "/cotisations", label: "Cotisations", shortLabel: "Cotise", icon: Target },
   { href: "/blog", label: "Blog", icon: BookOpen },
   { href: "/ressources", label: "Vidéos", icon: GraduationCap, desktopOnly: true },
   { href: "/badges", label: "Badges", icon: Award, desktopOnly: true },
@@ -59,6 +59,11 @@ const NAV: NavItem[] = [
   { href: "/plus", label: "Plus", icon: LayoutGrid, mobileOnly: true },
   { href: "/parametres", label: "Paramètres", icon: Settings },
 ];
+
+/** Les onglets de la barre du bas. « Paramètres » vit dans l'avatar du header. */
+const MOBILE_NAV = NAV.filter(
+  (i) => !i.desktopOnly && i.href !== "/parametres",
+);
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -200,16 +205,23 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </main>
 
-      {/* Bottom nav mobile : 6 onglets. Le "Profil/Paramètres" reste
-          accessible via l'avatar en haut à droite du header mobile. */}
+      {/* Bottom nav mobile. Le "Profil/Paramètres" reste accessible via
+          l'avatar en haut à droite du header mobile. */}
       <nav
         className="lg:hidden fixed inset-x-0 bottom-0 z-30 bg-card/95 backdrop-blur-md border-t border-border/60"
         aria-label="Navigation principale"
       >
-        <ul className="grid grid-cols-6">
-          {NAV.filter(
-            (i) => !i.desktopOnly && i.href !== "/parametres",
-          ).map((item) => {
+        {/* Le nombre de colonnes suit le nombre d'onglets au lieu d'être figé :
+            masquer une fonctionnalité laissait sinon une colonne vide à droite,
+            et toute la barre paraissait décalée. En style en ligne parce que
+            Tailwind ne génère pas de classe à partir d'une valeur calculée. */}
+        <ul
+          className="grid"
+          style={{
+            gridTemplateColumns: `repeat(${MOBILE_NAV.length}, minmax(0, 1fr))`,
+          }}
+        >
+          {MOBILE_NAV.map((item) => {
             const active =
               item.href === "/plus"
                 ? pathname === "/plus"

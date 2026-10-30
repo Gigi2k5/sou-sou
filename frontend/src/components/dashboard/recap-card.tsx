@@ -19,6 +19,7 @@ import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useCountUp } from "@/hooks/use-count-up";
 import { useMascotMessage } from "@/hooks/use-mascot-message";
 import { AVATAR_PRESETS, resolveAvatarUrl } from "@/lib/avatar";
+import { FEATURES } from "@/lib/features";
 import { formatDate, formatMoney } from "@/lib/format";
 import { getLucideIcon } from "@/lib/lucide-map";
 import { getRecap } from "@/lib/recap-api";
@@ -120,8 +121,8 @@ function RecapBody({
       <div className="flex flex-col items-center text-center py-6">
         <MascotAnimated mood="sleeping" size="sm" disableConfetti className="mb-2" />
         <p className="text-sm text-sousou-neutral max-w-xs mx-auto">
-          Pas encore de cotisations sur les {period === "week" ? "7" : "30"}{" "}
-          derniers jours. Ajoute une contribution pour démarrer ton récap.
+          Pas encore de versements sur les {period === "week" ? "7" : "30"}{" "}
+          derniers jours. Mets de côté pour ton objectif et ton récap démarre.
         </p>
       </div>
     );
@@ -148,13 +149,15 @@ function RecapBody({
             currency={currency}
             tint="text-sousou-primary"
           />
-          <BreakdownItem
-            icon={Target}
-            label="Cotisations"
-            amount={recap.totals.moneyPots}
-            currency={currency}
-            tint="text-violet-600"
-          />
+          {FEATURES.cotisations && (
+            <BreakdownItem
+              icon={Target}
+              label="Cotisations"
+              amount={recap.totals.moneyPots}
+              currency={currency}
+              tint="text-violet-600"
+            />
+          )}
         </div>
       </div>
 

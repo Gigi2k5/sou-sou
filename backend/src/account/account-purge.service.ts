@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 
+import { FEATURES } from '../config/features';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -37,6 +38,16 @@ export class AccountPurgeService {
    * faire — plutôt que de lui opposer un refus opaque.
    */
   async assertDeletable(userId: string): Promise<void> {
+    // Fonctionnalité masquée : ce garde deviendrait une impasse. Il demande de
+    // terminer ou supprimer sa cotisation au préalable — or l'écran qui le
+    // permet n'est plus accessible. La personne ne pourrait donc NI gérer sa
+    // cotisation, NI supprimer son compte.
+    //
+    // La purge supprime de toute façon les pots possédés ; les transactions des
+    // autres membres survivent, simplement détachées de leur catégorie
+    // (`SetNull`). Leur argent n'est pas effacé, seul le regroupement l'est.
+    if (!FEATURES.cotisations) return;
+
     const pots = await this.prisma.moneyPot.findMany({
       where: { ownerId: userId, isGroup: true, isCompleted: false },
       include: { _count: { select: { members: true } } },
